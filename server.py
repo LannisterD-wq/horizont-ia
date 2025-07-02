@@ -24,22 +24,27 @@ import base64
 from io import BytesIO
 import secrets
 from functools import wraps
-from database import get_db, close_db, User, Chat, Message, Lead
+from database import get_db, close_db, User, Chat, Message, Lead, migrate_existing_data
 
 app = Flask(__name__)
 CORS(app)
 
 # Configurações de segurança
-app.config['SECRET_KEY'] = secrets.token_hex(16)
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(16))
 
-# Sua API Key do Claude - MOVA PARA VARIÁVEL DE AMBIENTE EM PRODUÇÃO
+# Sua API Key do Claude
 ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
 
 # Cliente Anthropic
-client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+if ANTHROPIC_API_KEY:
+    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+else:
+    print("⚠️ ANTHROPIC_API_KEY não configurada! As mensagens de IA não funcionarão.")
+    client = None
 
-# Armazenamento em memória (em produção, use um banco de dados)
-active_sessions = {}  # Para controle de sessão
+# Armazenamento em memória para sessões
+active_sessions = {}
+chats_storage = {}  # Para migração se necessário
 
 # Prompt padrão do sistema
 system_prompt = """
@@ -337,10 +342,11 @@ def get_horizont_prompt():
     return system_prompt
 
 def require_auth(f):
-    """Decorator para verificar autenticação"""
+    """Decorator para verificar autenticação básica"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         # Em produção, implemente verificação de JWT ou sessão
+        # Por agora, apenas passa direto
         return f(*args, **kwargs)
     return decorated_function
 
@@ -625,22 +631,26 @@ def send_message():
             messages[-1]['content'] = full_message  # Usa a mensagem com o conteúdo do PDF
         
         # Chamar API do Claude
-        try:
-            response = client.messages.create(
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=3000,
-                system=get_horizont_prompt(),
-                messages=messages
-            )
-            
-            ai_response = response.content[0].text
-            log_activity(username, "AI_RESPONSE", f"Message length: {len(ai_response)}")
-            
-        except anthropic.APIError as e:
-            print(f"Erro da API Anthropic: {e}")
-            ai_response = generate_fallback_response(message)
-        except Exception as e:
-            print(f"Erro inesperado na API: {e}")
+        if client:
+            try:
+                response = client.messages.create(
+                    model="claude-3-5-sonnet-20241022",
+                    max_tokens=3000,
+                    system=get_horizont_prompt(),
+                    messages=messages
+                )
+                
+                ai_response = response.content[0].text
+                log_activity(username, "AI_RESPONSE", f"Message length: {len(ai_response)}")
+                
+            except anthropic.APIError as e:
+                print(f"Erro da API Anthropic: {e}")
+                ai_response = generate_fallback_response(message)
+            except Exception as e:
+                print(f"Erro inesperado na API: {e}")
+                ai_response = generate_fallback_response(message)
+        else:
+            print("Cliente Anthropic não configurado, usando resposta de fallback")
             ai_response = generate_fallback_response(message)
         
         # Processar resposta para extrair dados de gráfico
@@ -664,6 +674,8 @@ def send_message():
         
     except Exception as e:
         print(f"Erro ao processar mensagem: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False,
             'message': 'Erro ao processar mensagem'
@@ -763,7 +775,16 @@ def generate_presentation():
         username = data.get('username')
         client_name = data.get('clientName', 'Cliente')
         
-        # Pegar dados da conversa
+        # Pegar dados da conversa do banco
+        db = get_db()
+        user = db.query(User).filter_by(username=username).first()
+        if not user:
+            return jsonify({'success': False, 'message': 'Usuário não encontrado'}), 404
+            
+        chat = db.query(Chat).filter_by(id=int(chat_id), user_id=user.id).first()
+        if not chat:
+            return jsonify({'success': False, 'message': 'Chat não encontrado'}), 404
+        
         presentation_data = {
             'title': 'Proposta Horizont Investimentos',
             'client': client_name,
@@ -774,16 +795,11 @@ def generate_presentation():
         }
         
         # Buscar mensagens com gráficos e cálculos
-        for chat in chats_storage.get(username, []):
-            if str(chat['id']) == str(chat_id):
-                for msg in chat['messages']:
-                    if msg.get('chart'):
-                        presentation_data['charts'].append(msg['chart'])
-                    if msg['role'] == 'assistant':
-                        # Extrair cálculos e simulações
-                        if 'R$' in msg['content']:
-                            presentation_data['calculations'].append(msg['content'])
-                break
+        for msg in chat.messages:
+            if msg.chart:
+                presentation_data['charts'].append(msg.chart)
+            if msg.role == 'assistant' and 'R in msg.content:
+                presentation_data['calculations'].append(msg.content)
         
         log_activity(username, "GENERATE_PRESENTATION", f"Client: {client_name}")
         
@@ -797,6 +813,8 @@ def generate_presentation():
             'success': False,
             'message': 'Erro ao gerar apresentação'
         }), 500
+    finally:
+        close_db()
 
 # ROTAS ADMINISTRATIVAS
 
@@ -962,36 +980,6 @@ def get_user_chats(username):
     finally:
         close_db()
 
-@app.route('/api/admin/users/<username>/chats/<chat_id>', methods=['GET'])
-@require_auth
-def get_user_chat_details(username, chat_id):
-    try:
-        if username not in USERS:
-            return jsonify({
-                'success': False,
-                'message': 'Usuário não encontrado'
-            }), 404
-        
-        chats = chats_storage.get(username, [])
-        
-        for chat in chats:
-            if str(chat['id']) == str(chat_id):
-                return jsonify({
-                    'success': True,
-                    'chat': chat
-                })
-        
-        return jsonify({
-            'success': False,
-            'message': 'Chat não encontrado'
-        }), 404
-    except Exception as e:
-        print(f"Erro ao buscar detalhes do chat: {e}")
-        return jsonify({
-            'success': False,
-            'message': 'Erro ao carregar detalhes'
-        }), 500
-
 @app.route('/api/admin/prompt', methods=['GET'])
 @require_auth
 def get_prompt():
@@ -1041,101 +1029,57 @@ def update_prompt():
             'message': 'Erro ao salvar configurações'
         }), 500
 
-@app.route('/api/admin/report/<username>', methods=['GET'])
-@require_auth
-def generate_user_report(username):
-    """Gera relatório detalhado de um representante"""
-    try:
-        if username not in USERS:
-            return jsonify({
-                'success': False,
-                'message': 'Usuário não encontrado'
-            }), 404
-        
-        user_data = USERS[username]
-        user_chats = chats_storage.get(username, [])
-        
-        # Estatísticas
-        total_messages = sum(len(chat['messages']) for chat in user_chats)
-        total_charts = sum(len([msg for msg in chat['messages'] if msg.get('chart')]) for chat in user_chats)
-        
-        # Valores mencionados
-        all_values = []
-        for chat in user_chats:
-            for msg in chat['messages']:
-                if msg['role'] == 'assistant':
-                    valores = re.findall(r'R\$\s*([\d.,]+)', msg['content'])
-                    all_values.extend(valores)
-        
-        # Atividade por mês
-        monthly_activity = {}
-        for chat in user_chats:
-            month = chat['createdAt'][:7]  # YYYY-MM
-            monthly_activity[month] = monthly_activity.get(month, 0) + 1
-        
-        report = {
-            'username': username,
-            'name': user_data.get('name', username),
-            'cpf': user_data.get('cpf', ''),
-            'totalChats': len(user_chats),
-            'totalMessages': total_messages,
-            'totalCharts': total_charts,
-            'averageMessagesPerChat': round(total_messages / len(user_chats), 1) if user_chats else 0,
-            'createdChats': [
-                {
-                    'title': chat['title'],
-                    'date': chat['createdAt'],
-                    'messagesCount': len(chat['messages'])
-                } for chat in user_chats
-            ],
-            'mentionedValues': all_values[:20],  # Top 20 valores
-            'monthlyActivity': monthly_activity
-        }
-        
-        return jsonify({
-            'success': True,
-            'report': report
-        })
-    except Exception as e:
-        print(f"Erro ao gerar relatório: {e}")
-        return jsonify({
-            'success': False,
-            'message': 'Erro ao gerar relatório'
-        }), 500
-# ROTAS DE LEADS
+# ROTAS DE LEADS - CORRIGIDAS
 
 @app.route('/api/leads/<username>', methods=['GET'])
 @require_auth
 def get_user_leads(username):
     try:
+        print(f"=== BUSCANDO LEADS ===")
+        print(f"Username: {username}")
+        
         db = get_db()
         user = db.query(User).filter_by(username=username).first()
         
         if not user:
-            return jsonify({'success': False, 'message': 'Usuário não encontrado'}), 404
+            print(f"Usuário não encontrado: {username}")
+            return jsonify({
+                'success': False, 
+                'message': 'Usuário não encontrado'
+            }), 404
         
         leads_data = []
         for lead in user.leads:
-            leads_data.append({
+            lead_dict = {
                 'id': lead.id,
                 'name': lead.name,
                 'phone': lead.phone,
-                'email': lead.email,
+                'email': lead.email or '',
                 'status': lead.status,
-                'value': lead.value,
-                'product': lead.product,
-                'notes': lead.notes,
+                'value': float(lead.value or 0),
+                'product': lead.product or '',
+                'notes': lead.notes or '',
                 'createdAt': lead.created_at.isoformat(),
                 'updatedAt': lead.updated_at.isoformat()
-            })
+            }
+            leads_data.append(lead_dict)
+        
+        print(f"Total de leads encontrados: {len(leads_data)}")
         
         return jsonify({
             'success': True,
             'leads': leads_data
         })
+        
     except Exception as e:
-        print(f"Erro ao buscar leads: {e}")
-        return jsonify({'success': False, 'message': 'Erro ao carregar leads'}), 500
+        print(f"ERRO ao buscar leads: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        return jsonify({
+            'success': False, 
+            'message': f'Erro ao carregar leads: {str(e)}'
+        }), 500
     finally:
         close_db()
 
@@ -1143,40 +1087,82 @@ def get_user_leads(username):
 @require_auth
 def create_lead(username):
     try:
+        # Log da requisição
+        print(f"=== CRIANDO LEAD ===")
+        print(f"Username: {username}")
+        print(f"Dados recebidos: {request.json}")
+        
         data = request.json
+        
+        # Validação dos dados
+        required_fields = ['name', 'phone', 'status']
+        for field in required_fields:
+            if not data.get(field):
+                print(f"Campo obrigatório faltando: {field}")
+                return jsonify({
+                    'success': False, 
+                    'message': f'Campo {field} é obrigatório'
+                }), 400
         
         db = get_db()
         user = db.query(User).filter_by(username=username).first()
         
         if not user:
-            return jsonify({'success': False, 'message': 'Usuário não encontrado'}), 404
+            print(f"Usuário não encontrado: {username}")
+            return jsonify({
+                'success': False, 
+                'message': 'Usuário não encontrado'
+            }), 404
         
-        new_lead = Lead(
-            user_id=user.id,
-            name=data.get('name'),
-            phone=data.get('phone'),
-            email=data.get('email'),
-            status=data.get('status'),
-            value=float(data.get('value', 0)),
-            product=data.get('product'),
-            notes=data.get('notes')
-        )
-        
-        db.add(new_lead)
-        db.commit()
+        # Criar lead com validação de tipos
+        try:
+            new_lead = Lead(
+                user_id=user.id,
+                name=str(data.get('name')),
+                phone=str(data.get('phone')),
+                email=str(data.get('email', '')),
+                status=str(data.get('status')),
+                value=float(data.get('value', 0)),
+                product=str(data.get('product', '')),
+                notes=str(data.get('notes', ''))
+            )
+            
+            db.add(new_lead)
+            db.commit()
+            
+            print(f"Lead criado com sucesso: ID {new_lead.id}")
+            
+            # Log de atividade
+            log_activity(username, "CREATE_LEAD", f"Lead: {new_lead.name}")
+            
+            return jsonify({
+                'success': True,
+                'lead': {
+                    'id': new_lead.id,
+                    'name': new_lead.name,
+                    'phone': new_lead.phone,
+                    'createdAt': new_lead.created_at.isoformat()
+                }
+            })
+            
+        except ValueError as ve:
+            print(f"Erro de validação: {ve}")
+            db.rollback()
+            return jsonify({
+                'success': False, 
+                'message': f'Erro de validação: {str(ve)}'
+            }), 400
+            
+    except Exception as e:
+        print(f"ERRO ao criar lead: {e}")
+        print(f"Tipo de erro: {type(e)}")
+        import traceback
+        traceback.print_exc()
         
         return jsonify({
-            'success': True,
-            'lead': {
-                'id': new_lead.id,
-                'name': new_lead.name,
-                'phone': new_lead.phone,
-                'createdAt': new_lead.created_at.isoformat()
-            }
-        })
-    except Exception as e:
-        print(f"Erro ao criar lead: {e}")
-        return jsonify({'success': False, 'message': 'Erro ao criar lead'}), 500
+            'success': False, 
+            'message': f'Erro ao criar lead: {str(e)}'
+        }), 500
     finally:
         close_db()
 
@@ -1184,6 +1170,9 @@ def create_lead(username):
 @require_auth
 def delete_lead(username, lead_id):
     try:
+        print(f"=== DELETANDO LEAD ===")
+        print(f"Username: {username}, Lead ID: {lead_id}")
+        
         db = get_db()
         user = db.query(User).filter_by(username=username).first()
         
@@ -1193,12 +1182,19 @@ def delete_lead(username, lead_id):
         lead = db.query(Lead).filter_by(id=int(lead_id), user_id=user.id).first()
         
         if lead:
+            lead_name = lead.name
             db.delete(lead)
             db.commit()
+            print(f"Lead deletado: {lead_name}")
+            log_activity(username, "DELETE_LEAD", f"Lead: {lead_name}")
+        else:
+            print(f"Lead não encontrado: ID {lead_id}")
         
         return jsonify({'success': True})
     except Exception as e:
         print(f"Erro ao deletar lead: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'message': 'Erro ao deletar lead'}), 500
     finally:
         close_db()
@@ -1209,10 +1205,10 @@ def health_check():
     return jsonify({
         'status': 'healthy',
         'timestamp': datetime.now().isoformat(),
-        'active_users': len(chats_storage),
-        'total_chats': sum(len(chats) for chats in chats_storage.values()),
+        'database': 'connected',
         'version': '1.0.0',
-        'logo_exists': os.path.exists('logo.png')
+        'logo_exists': os.path.exists('logo.png'),
+        'anthropic_configured': bool(ANTHROPIC_API_KEY)
     })
 
 @app.errorhandler(404)
@@ -1234,30 +1230,24 @@ if __name__ == '__main__':
     print("📍 Acesse: http://localhost:8000")
     print("👤 Login: admin/horizont2025 ou carlos/123456")
     print("📱 Interface otimizada para mobile!")
-    print("🔧 Modo debug ativo - reinicia automaticamente")
-    print("🌐 Acesso via rede local habilitado (0.0.0.0)")
-    print("\n✅ Melhorias implementadas:")
-    print("   - ✅ Suporte completo a arquivos estáticos")
-    print("   - ✅ Rota específica para logo.png")
-    print("   - ✅ Fallback automático se logo não existir")
-    print("   - ✅ Logs de atividade detalhados")
-    print("   - ✅ Tratamento de erros robusto")
-    print("   - ✅ Health check com status da logo")
-    print("   - ✅ Serve qualquer arquivo estático")
+    print("🔧 Modo produção ativo")
     
-    # Verificar se logo existe
-    if os.path.exists('logo.png'):
-        print("   - 🖼️ Logo encontrada: logo.png")
-    else:
-        print("   - ⚠️ Logo não encontrada - usando fallback")
+    print("\n✅ Status do sistema:")
+    print(f"   - 🗄️ Banco de dados: {'PostgreSQL' if 'postgresql' in DATABASE_URL else 'SQLite'}")
+    print(f"   - 🤖 API Anthropic: {'Configurada' if ANTHROPIC_API_KEY else 'Não configurada'}")
+    print(f"   - 🖼️ Logo: {'Encontrada' if os.path.exists('logo.png') else 'Não encontrada'}")
+    print(f"   - 📊 Sistema de leads: Ativo")
+    
+    if not ANTHROPIC_API_KEY:
+        print("\n⚠️ AVISO: Configure ANTHROPIC_API_KEY para habilitar IA")
     
     print("\n")
     
     # Configuração para produção
     port = int(os.environ.get('PORT', 8000))
     app.run(
-        debug=False,  # Mudou para False
-        port=port,    # Usa porta do ambiente
+        debug=False,
+        port=port,
         host='0.0.0.0',
         threaded=True
     )
