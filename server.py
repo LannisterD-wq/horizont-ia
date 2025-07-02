@@ -772,16 +772,18 @@ def generate_presentation():
 @require_auth
 def get_users():
     try:
+        db = get_db()
+        users = db.query(User).filter(User.username != 'admin').all()
+        
         users_list = []
-        for username, user_data in USERS.items():
-            if username != 'admin':  # Não mostrar admin na lista
-                users_list.append({
-                    'username': username,
-                    'role': user_data['role'],
-                    'name': user_data.get('name', username),
-                    'cpf': user_data.get('cpf', ''),
-                    'chatsCount': len(chats_storage.get(username, []))
-                })
+        for user in users:
+            users_list.append({
+                'username': user.username,
+                'role': user.role,
+                'name': user.name,
+                'cpf': user.cpf,
+                'chatsCount': len(user.chats)
+            })
         
         return jsonify({
             'success': True,
@@ -793,6 +795,8 @@ def get_users():
             'success': False,
             'message': 'Erro ao carregar usuários'
         }), 500
+    finally:
+        close_db()
 
 @app.route('/api/admin/users', methods=['POST'])
 @require_auth
@@ -816,18 +820,26 @@ def create_user():
                 'message': 'Senha deve ter pelo menos 6 caracteres'
             }), 400
         
-        if username in USERS:
+        db = get_db()
+        
+        # Verifica se usuário já existe
+        if db.query(User).filter_by(username=username).first():
             return jsonify({
                 'success': False,
                 'message': 'Usuário já existe'
             }), 400
         
-        USERS[username] = {
-            'password': password,
-            'role': 'user',
-            'name': name,
-            'cpf': cpf
-        }
+        # Cria novo usuário
+        new_user = User(
+            username=username,
+            password=password,
+            name=name,
+            cpf=cpf,
+            role='user'
+        )
+        
+        db.add(new_user)
+        db.commit()
         
         log_activity("admin", "CREATE_USER", f"New user: {username} ({name})")
         
@@ -841,6 +853,8 @@ def create_user():
             'success': False,
             'message': 'Erro ao criar usuário'
         }), 500
+    finally:
+        close_db()
 
 @app.route('/api/admin/users/<username>', methods=['DELETE'])
 @require_auth
