@@ -416,30 +416,39 @@ alert('Erro ao deletar lead');
 
 // Load user chats
 async function loadChats() {
-try {
-const response = await fetch(`${API_URL}/chats/${currentUser.username}`, {
-headers: {
-'Authorization': `Bearer ${currentUser.token}`
-}
-});
-const data = await response.json();
+    console.log('Carregando chats...');
+    try {
+        const response = await fetch(`${API_URL}/chats/${currentUser.username}`, {
+            headers: {
+                'Authorization': `Bearer ${currentUser.token}`
+            }
+        });
+        const data = await response.json();
 
-if (data.success) {
-// Só mantém chats com mensagens
-chats = data.chats.filter(chat => Array.isArray(chat.messages) && chat.messages.length > 0);
-renderChatList();
+        if (data.success) {
+            // Garante que cada chat tem um array de mensagens
+            chats = data.chats.map(chat => ({
+                ...chat,
+                messages: Array.isArray(chat.messages) ? chat.messages : []
+            }));
+            
+            console.log('Chats carregados:', chats);
+            renderChatList();
 
-// Select first chat or create new one
-if (chats.length > 0) {
-selectChat(chats[0].id);
-} else {
-currentChatId = null;
-renderMessages();
-}
-}
-} catch (error) {
-console.error('Error loading chats:', error);
-}
+            // Se não há chats, mostra mensagem
+            if (chats.length === 0) {
+                currentChatId = null;
+                renderMessages();
+            } else {
+                // Seleciona o primeiro chat se houver
+                selectChat(chats[0].id);
+            }
+        }
+    } catch (error) {
+        console.error('Error loading chats:', error);
+        chats = [];
+        renderChatList();
+    }
 }
 
 // Render chat list
@@ -466,37 +475,73 @@ chatList.appendChild(chatItem);
 
 // Select a chat
 function selectChat(chatId) {
-currentChatId = chatId;
-renderChatList();
-renderMessages();
+    console.log('Selecionando chat:', chatId);
+    
+    // Converte para número se necessário
+    const numericChatId = typeof chatId === 'string' ? parseInt(chatId) : chatId;
+    
+    // Verifica se o chat existe
+    const chatExists = chats.find(chat => chat.id === numericChatId);
+    if (!chatExists) {
+        console.error('Chat não existe:', numericChatId);
+        return;
+    }
+    
+    currentChatId = numericChatId;
+    console.log('Chat selecionado:', currentChatId);
+    
+    renderChatList();
+    renderMessages();
 
-// Close sidebar on mobile
-if (window.innerWidth < 768) {
-closeSidebar();
-}
+    // Close sidebar on mobile
+    if (window.innerWidth < 768) {
+        closeSidebar();
+    }
 }
 
 // Create new chat
 async function createNewChat() {
-try {
-const response = await fetch(`${API_URL}/chats/${currentUser.username}`, {
-method: 'POST',
-headers: {
-'Content-Type': 'application/json',
-'Authorization': `Bearer ${currentUser.token}`
-},
-body: JSON.stringify({ title: 'Nova Conversa' })
-});
+    console.log('Criando novo chat...');
+    try {
+        const response = await fetch(`${API_URL}/chats/${currentUser.username}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${currentUser.token}`
+            },
+            body: JSON.stringify({ title: 'Nova Conversa' })
+        });
 
-const data = await response.json();
+        const data = await response.json();
+        console.log('Resposta do servidor:', data);
 
-if (data.success) {
-await loadChats();
-selectChat(data.chat.id);
-}
-} catch (error) {
-console.error('Error creating chat:', error);
-}
+        if (data.success && data.chat) {
+            // Adiciona o novo chat ao array local com array de mensagens vazio
+            const newChat = {
+                id: data.chat.id,
+                title: data.chat.title,
+                messages: [],
+                createdAt: data.chat.createdAt || new Date().toISOString()
+            };
+            
+            // Adiciona ao início do array
+            chats.unshift(newChat);
+            
+            // Renderiza a lista
+            renderChatList();
+            
+            // Seleciona o novo chat
+            selectChat(data.chat.id);
+            
+            console.log('Chat criado e selecionado:', newChat);
+        } else {
+            console.error('Erro ao criar chat:', data.message);
+            alert('Erro ao criar nova conversa');
+        }
+    } catch (error) {
+        console.error('Error creating chat:', error);
+        alert('Erro de conexão ao criar conversa');
+    }
 }
 
 // Edit chat title
