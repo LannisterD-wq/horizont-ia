@@ -572,6 +572,21 @@ def send_message():
                 'message': 'Dados incompletos'
             }), 400
         
+        # Processar arquivos anexados ANTES de salvar
+        file_context = ""
+        for file in files:
+            if file.get('type') == 'application/pdf':
+                pdf_text = extract_pdf_text(file.get('data'))
+                if pdf_text:
+                    file_context += f"\n\nConteúdo do PDF {file.get('name')}:\n{pdf_text[:3000]}..."
+                    print(f"PDF processado: {file.get('name')} - {len(pdf_text)} caracteres")
+        
+        # Adicionar contexto do arquivo à mensagem para o Claude
+        full_message = message
+        if file_context:
+            full_message += f"\n\n[Arquivo anexado]{file_context}"
+            print(f"Contexto do arquivo adicionado à mensagem")
+        
         db = get_db()
         
         # Busca o chat
@@ -582,11 +597,11 @@ def send_message():
                 'message': 'Conversa não encontrada'
             }), 404
         
-        # Adiciona mensagem do usuário
+        # Adiciona mensagem do usuário (salva apenas a mensagem original)
         user_message = Message(
             chat_id=chat.id,
             role='user',
-            content=message,
+            content=message,  # Mensagem original sem o arquivo
             files=files if files else None
         )
         db.add(user_message)
@@ -605,11 +620,9 @@ def send_message():
                 'content': msg.content
             })
         
-        # Adiciona mensagem atual
-        messages.append({
-            'role': 'user',
-            'content': message
-        })
+        # Para a última mensagem (atual), inclui o contexto do arquivo
+        if messages:
+            messages[-1]['content'] = full_message  # Usa a mensagem com o conteúdo do PDF
         
         # Chamar API do Claude
         try:
