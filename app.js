@@ -555,14 +555,14 @@ function renderMessages() {
         `;
         
         // Add files if present
-        if (msg.files && msg.files.length > 0) {
-            messageContent += '<div style="margin-bottom: 8px;">';
-            msg.files.forEach(file => {
-                const icon = file.type.startsWith('image/') ? '🖼️' : '📄';
-                messageContent += `<span class="file-item">${icon} ${file.name}</span>`;
-            });
-            messageContent += '</div>';
+        if (msg.role === 'assistant' && (msg.content.includes('R') || msg.chart)) {
+            messageContent += `
+                <button class="share-btn" onclick="shareViaWhatsApp(${index})">
+                    📱 Compartilhar no WhatsApp
+                </button>
+            `;
         }
+
         
         messageContent += formatMessage(msg.content);
         
