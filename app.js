@@ -10,7 +10,7 @@ let isLeadsView = false;
 const API_URL = window.location.hostname.includes('railway.app') 
     ? `${window.location.origin}/api`
     : window.location.protocol === 'file:' 
-        ? 'http://127.0.0.1:8000/api'
+        ? 'https://horizont-ia-production.up.railway.app/'
         : '/api';
 
 // Debug - remover depois
