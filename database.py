@@ -5,11 +5,19 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship, scoped_session
 import json
 
-# Pega a URL do banco do Railway automaticamente
-DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///horizont.db')
+# Pega a URL do banco do Railway ou usa SQLite local
+DATABASE_URL = os.environ.get('DATABASE_URL', '')
+
+# Se não houver DATABASE_URL, usa SQLite
+if not DATABASE_URL:
+    DATABASE_URL = 'sqlite:///horizont.db'
+    print("⚠️ DATABASE_URL não encontrada, usando SQLite local")
+
 # Corrige URL para PostgreSQL se necessário
 if DATABASE_URL.startswith('postgres://'):
     DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+
+print(f"📊 Conectando ao banco de dados...")
 
 # Configuração do SQLAlchemy
 engine = create_engine(DATABASE_URL)
@@ -78,7 +86,11 @@ class Lead(Base):
     user = relationship('User', back_populates='leads')
 
 # Cria as tabelas
-Base.metadata.create_all(bind=engine)
+try:
+    Base.metadata.create_all(bind=engine)
+    print("✅ Tabelas do banco de dados criadas/verificadas")
+except Exception as e:
+    print(f"❌ Erro ao criar tabelas: {e}")
 
 # Funções auxiliares
 def get_db():
@@ -94,8 +106,9 @@ def init_default_users():
     db = SessionLocal()
     try:
         # Verifica se já existem usuários
-        if db.query(User).first():
-            print("✅ Usuários já existem no banco de dados")
+        existing_users = db.query(User).count()
+        if existing_users > 0:
+            print(f"✅ {existing_users} usuários já existem no banco de dados")
             return
         
         # Cria usuários padrão
@@ -170,4 +183,7 @@ def migrate_existing_data(chats_storage):
         db.close()
 
 # Inicializa o banco com usuários padrão
-init_default_users()
+try:
+    init_default_users()
+except Exception as e:
+    print(f"⚠️ Erro ao inicializar usuários: {e}")
