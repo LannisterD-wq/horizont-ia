@@ -1389,47 +1389,54 @@
         }
         
         // Load user leads
-        function loadUserLeads() {
-            // In a real app, this would fetch from the server
-            const savedLeads = localStorage.getItem(`leads_${currentUser.username}`);
-            if (savedLeads) {
-                userLeads = JSON.parse(savedLeads);
-            } else {
-                userLeads = [];
+        async function loadUserLeads() {
+            try {
+                const response = await fetch(`${API_URL}/leads/${currentUser.username}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    userLeads = data.leads;
+                    updateLeadsView();
+                }
+            } catch (error) {
+                console.error('Erro ao carregar leads:', error);
             }
-            updateLeadsView();
         }
         
         // Save user lead
-        function saveUserLead(event) {
+        async function saveUserLead(event) {
             event.preventDefault();
             
-            const lead = {
-                id: Date.now(),
+            const leadData = {
                 name: document.getElementById('userLeadName').value.trim(),
                 phone: document.getElementById('userLeadPhone').value.trim(),
                 email: document.getElementById('userLeadEmail').value.trim(),
                 status: document.getElementById('userLeadStatus').value,
                 value: parseFloat(document.getElementById('userLeadValue').value) || 0,
                 product: document.getElementById('userLeadProduct').value,
-                notes: document.getElementById('userLeadNotes').value.trim(),
-                createdAt: new Date().toISOString(),
-                lastContact: new Date().toISOString()
+                notes: document.getElementById('userLeadNotes').value.trim()
             };
             
-            userLeads.unshift(lead);
-            
-            // Save to localStorage (in production, save to server)
-            localStorage.setItem(`leads_${currentUser.username}`, JSON.stringify(userLeads));
-            
-            // Clear form
-            event.target.reset();
-            
-            // Update view
-            updateLeadsView();
-            
-            // Show success message
-            alert('Lead adicionado com sucesso!');
+            try {
+                const response = await fetch(`${API_URL}/leads/${currentUser.username}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(leadData)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    event.target.reset();
+                    await loadUserLeads(); // Recarrega a lista
+                    alert('Lead adicionado com sucesso!');
+                }
+            } catch (error) {
+                console.error('Erro ao salvar lead:', error);
+                alert('Erro ao adicionar lead');
+            }
         }
         
         // Update leads view
@@ -1513,7 +1520,7 @@
         }
         
         // Edit lead
-        function editLead(leadId) {
+        async function editLead(leadId) {
             const lead = userLeads.find(l => l.id === leadId);
             if (!lead) return;
             
@@ -1526,22 +1533,39 @@
             document.getElementById('userLeadProduct').value = lead.product || '';
             document.getElementById('userLeadNotes').value = lead.notes || '';
             
-            // Remove the lead from list
-            userLeads = userLeads.filter(l => l.id !== leadId);
-            localStorage.setItem(`leads_${currentUser.username}`, JSON.stringify(userLeads));
-            updateLeadsView();
+            // Delete the lead from database
+            try {
+                const response = await fetch(`${API_URL}/leads/${currentUser.username}/${leadId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    await loadUserLeads(); // Recarrega a lista sem o lead deletado
+                }
+            } catch (error) {
+                console.error('Erro ao remover lead para edição:', error);
+            }
             
             // Scroll to form
             document.querySelector('.add-lead-form').scrollIntoView({ behavior: 'smooth' });
         }
         
         // Delete lead
-        function deleteLead(leadId) {
+        async function deleteLead(leadId) {
             if (!confirm('Tem certeza que deseja deletar este lead?')) return;
             
-            userLeads = userLeads.filter(l => l.id !== leadId);
-            localStorage.setItem(`leads_${currentUser.username}`, JSON.stringify(userLeads));
-            updateLeadsView();
+            try {
+                const response = await fetch(`${API_URL}/leads/${currentUser.username}/${leadId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    await loadUserLeads(); // Recarrega a lista
+                }
+            } catch (error) {
+                console.error('Erro ao deletar lead:', error);
+                alert('Erro ao deletar lead');
+            }
         }
 
         // Load user chats
