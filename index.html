@@ -470,7 +470,7 @@
             position: relative;
         }
         
-        /* Ajuste do canvas em estado normal */
+        /* Canvas no estado normal */
         .chart-container canvas {
             max-width: 100%;
             height: 300px !important;
@@ -491,33 +491,35 @@
             display: none;
         }
         
-        /* === Estado expandido: ocupa toda a tela === */
+        /* === Estado expandido em “painel” inferior ocupando 50% da tela === */
         .chart-container.expanded {
             position: fixed !important;
-            top: 0;
+            bottom: 0;             /* cola na borda de baixo */
             left: 0;
             right: 0;
-            bottom: 0;
+            height: 50vh !important;/* metade da altura da viewport */
             width: 100vw !important;
-            height: 100vh !important;
             margin: 0;
-            padding: 0;
+            padding: 20px;         /* se quiser manter padding interno */
             transform: none !important;
             z-index: 10000;
             background: rgba(20, 20, 20, 0.95);
         }
         
-        /* Canvas no estado expandido: preenche 100% menos a altura do botão */
+        /* Canvas no estado expandido: preenche o container menos o espaço do botão */
         .chart-container.expanded canvas {
             width: 100% !important;
-            height: calc(100% - 40px) !important; /* ajuste “40px” se seu botão for maior/menor */
+            height: calc(100% - 40px) !important; /* 40px = espaço reservado para o botão */
         }
         
-        /* Botão de recolher aparece sempre por cima */
+        /* Botão de recolher sempre visível dentro do painel */
         .chart-container.expanded .chart-expand-btn {
             display: block !important;
+            top: 10px;  /* posicionado dentro do container expandido */
+            right: 10px;
             z-index: 10001;
         }
+
 
 
         /* Input Area */
