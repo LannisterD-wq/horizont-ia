@@ -1195,8 +1195,10 @@
         /* iOS specific fixes */
         @supports (-webkit-touch-callout: none) {
             .app-container {
+                display: none;         /* continua oculto até o login */
+                flex-direction: column;
                 height: 100vh;
-                height: -webkit-fill-available;
+                overflow: hidden;
             }
             
             .messages-container,
@@ -1219,6 +1221,34 @@
         
         body.keyboard-open .messages-container {
             padding-bottom: 100px;
+        }
+        /* O chat-area vira flex container vertical */
+        .chat-area {
+          display: flex;
+          flex-direction: column;
+          flex: 1;
+          overflow: hidden;
+        }
+        /* Container de mensagens rolável por toque */
+        .messages-container {
+          flex: 1;
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch; /* inércia no iOS */
+          overscroll-behavior: contain;
+        }
+        /* Se você usa leads-view, também */
+        .leads-view {
+          -webkit-overflow-scrolling: touch;
+          overscroll-behavior: contain;
+        }
+        /* E no caso de sidebar em mobile (chat-list) */
+        .chat-list {
+          -webkit-overflow-scrolling: touch;
+          overscroll-behavior: contain;
+        }
+        /* Ajuste opcional ao abrir teclado */
+        body.keyboard-open .messages-container {
+          padding-bottom: 100px;
         }
     </style>
 </head>
