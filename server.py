@@ -866,19 +866,18 @@ def delete_user(username):
                 'message': 'Não é possível deletar o admin'
             }), 400
         
-        if username not in USERS:
+        db = get_db()
+        user = db.query(User).filter_by(username=username).first()
+        
+        if not user:
             return jsonify({
                 'success': False,
                 'message': 'Usuário não encontrado'
             }), 404
         
-        # Deletar usuário e seus dados
-        user_name = USERS[username].get('name', username)
-        del USERS[username]
-        
-        # Deletar chats do usuário também
-        if username in chats_storage:
-            del chats_storage[username]
+        user_name = user.name
+        db.delete(user)
+        db.commit()
         
         log_activity("admin", "DELETE_USER", f"Deleted user: {username} ({user_name})")
         
@@ -892,6 +891,8 @@ def delete_user(username):
             'success': False,
             'message': 'Erro ao deletar usuário'
         }), 500
+    finally:
+        close_db()
 
 @app.route('/api/admin/users/<username>/chats', methods=['GET'])
 @require_auth
