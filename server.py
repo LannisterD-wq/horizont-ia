@@ -798,7 +798,7 @@ def generate_presentation():
         for msg in chat.messages:
             if msg.chart:
                 presentation_data['charts'].append(msg.chart)
-            if msg.role == 'assistant' and 'R in msg.content:
+            if msg.role == 'assistant' and 'R$' in msg.content:
                 presentation_data['calculations'].append(msg.content)
         
         log_activity(username, "GENERATE_PRESENTATION", f"Client: {client_name}")
