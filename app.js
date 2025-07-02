@@ -8,8 +8,12 @@ let isLeadsView = false;
 
 // API Base URL - Use o endereço completo quando abrir como arquivo
 const API_URL = window.location.protocol === 'file:' 
-    ? 'http://127.0.0.1:8080/api'
+    ? 'http://127.0.0.1:8000/api'
     : '/api';
+
+// Debug - remover depois
+console.log('API_URL:', API_URL);
+console.log('Current URL:', window.location.href);
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
@@ -78,6 +82,8 @@ async function handleLogin(event) {
     const password = document.getElementById('password').value;
     const errorDiv = document.getElementById('loginError');
     
+    console.log('Tentando login:', { username, password }); // Debug
+    
     try {
         const response = await fetch(`${API_URL}/login`, {
             method: 'POST',
@@ -87,7 +93,10 @@ async function handleLogin(event) {
             body: JSON.stringify({ username, password })
         });
         
+        console.log('Response status:', response.status); // Debug
+        
         const data = await response.json();
+        console.log('Response data:', data); // Debug
         
         if (data.success) {
             currentUser = {
@@ -104,8 +113,8 @@ async function handleLogin(event) {
             errorDiv.style.display = 'block';
         }
     } catch (error) {
-        console.error('Login error:', error);
-        errorDiv.textContent = 'Erro de conexão com o servidor';
+        console.error('Login error completo:', error);
+        errorDiv.textContent = 'Erro de conexão com o servidor. Verifique se o servidor está rodando.';
         errorDiv.style.display = 'block';
     }
 }
