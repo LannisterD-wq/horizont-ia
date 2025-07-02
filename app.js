@@ -388,15 +388,12 @@ async function loadChats() {
         const data = await response.json();
         
         if (data.success) {
-            chats = data.chats;
+            // Só mantém chats com mensagens
+            chats = data.chats.filter(chat => Array.isArray(chat.messages) && chat.messages.length > 0);
             renderChatList();
             
-            // Select first chat or create new one
-            if (chats.length > 0) {
-                selectChat(chats[0].id);
-            } else {
-                createNewChat();
-            }
+            // Não selecionar nenhuma conversa automaticamente:
+            // o usuário deve clicar em "+ Nova Conversa" ou em um item da lista.
         }
     } catch (error) {
         console.error('Error loading chats:', error);
@@ -414,16 +411,27 @@ function renderChatList() {
         chatItem.onclick = () => selectChat(chat.id);
         
         chatItem.innerHTML = `
-            <span class="chat-title" ondblclick="editChatTitle('${chat.id}')">${chat.title}</span>
+            <span class="chat-title" ondblclick="editChatTitle('${chat.id}')">
+                ${chat.title}
+            </span>
             <div class="chat-actions">
-                <button class="chat-action-btn" onclick="editChatTitle('${chat.id}'); event.stopPropagation();" title="Editar título">✏️</button>
-                <button class="chat-action-btn" onclick="deleteChat('${chat.id}', event)" title="Deletar conversa">🗑️</button>
+                <button
+                   class="chat-action-btn"
+                   onclick="editChatTitle('${chat.id}'); event.stopPropagation();"
+                   title="Editar título"
+                >✏️</button>
+                <button
+                   class="chat-action-btn"
+                   onclick="deleteChat('${chat.id}', event)"
+                   title="Deletar conversa"
+                >🗑️</button>
             </div>
         `;
         
         chatList.appendChild(chatItem);
     });
 }
+
 
 // Select a chat
 function selectChat(chatId) {
