@@ -489,15 +489,9 @@
             display: none;
         }
 
-        .chart-container.expanded {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 90vw;
-            height: 80vh;
-            z-index: 1000;
-            background: rgba(20, 20, 20, 0.98);
+        .chart-container.expanded .chart-expand-btn {
+            display: block !important;
+            z-index: 1001;
         }
 
         .chart-container.expanded canvas {
