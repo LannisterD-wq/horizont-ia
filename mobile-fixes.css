@@ -1,0 +1,303 @@
+/* Mobile Fixes - Estilo ChatGPT */
+
+/* Overlay escuro quando sidebar está aberta */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 99;
+    backdrop-filter: blur(2px);
+}
+
+.sidebar-overlay.active {
+    display: block;
+}
+
+/* Mobile específico */
+@media (max-width: 768px) {
+    /* Header mobile */
+    .header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 1000;
+        height: 60px;
+    }
+    
+    /* Ajuste do conteúdo principal */
+    .main-content {
+        padding-top: 60px;
+        height: 100vh;
+    }
+    
+    /* Sidebar estilo ChatGPT */
+    .sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 85%;
+        max-width: 320px;
+        z-index: 1001;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        box-shadow: 2px 0 20px rgba(0, 0, 0, 0.3);
+    }
+    
+    .sidebar.open {
+        transform: translateX(0);
+    }
+    
+    /* Chat area fullscreen mobile */
+    .chat-area, .leads-view {
+        position: fixed;
+        top: 60px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        height: calc(100vh - 60px);
+    }
+    
+    /* Messages container ajustado */
+    .messages-container {
+        height: calc(100vh - 180px);
+        padding: 10px;
+    }
+    
+    /* Input area fixo no bottom */
+    .input-area {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 10px;
+        background: rgba(20, 20, 20, 0.98);
+        backdrop-filter: blur(10px);
+        z-index: 100;
+    }
+    
+    /* Mensagens mais compactas */
+    .message {
+        margin-bottom: 12px;
+    }
+    
+    .message-content {
+        padding: 12px;
+        font-size: 15px;
+    }
+    
+    /* Gráficos responsivos */
+    .chart-container {
+        padding: 10px;
+        margin: 10px 0;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .chart-container canvas {
+        min-width: 300px;
+        height: 250px !important;
+    }
+    
+    /* Admin panel mobile */
+    .admin-panel {
+        padding: 15px;
+        padding-top: 75px;
+    }
+    
+    .admin-tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        white-space: nowrap;
+        padding-bottom: 10px;
+    }
+    
+    .admin-tab {
+        padding: 10px 16px;
+        font-size: 14px;
+    }
+    
+    /* Tabelas responsivas */
+    .users-table {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .users-table th,
+    .users-table td {
+        padding: 8px;
+        font-size: 13px;
+        white-space: nowrap;
+    }
+    
+    /* Leads mobile */
+    .leads-view {
+        padding: 15px;
+        padding-top: 75px;
+        padding-bottom: 20px;
+        overflow-y: auto;
+    }
+    
+    .leads-stats {
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+    
+    .stat-card {
+        padding: 15px;
+    }
+    
+    .stat-value {
+        font-size: 24px;
+    }
+    
+    .form-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    
+    .lead-card {
+        padding: 15px;
+    }
+    
+    .lead-actions {
+        flex-wrap: wrap;
+    }
+    
+    .lead-action-btn {
+        min-width: calc(50% - 5px);
+        padding: 10px;
+        font-size: 13px;
+    }
+    
+    /* Botões mobile */
+    .send-btn {
+        padding: 12px 20px;
+        font-size: 15px;
+    }
+    
+    .new-chat-btn {
+        margin: 15px;
+        padding: 12px;
+        font-size: 15px;
+    }
+    
+    /* Share button mobile */
+    .share-btn {
+        width: 100%;
+        justify-content: center;
+        padding: 10px;
+        margin-top: 10px;
+    }
+    
+    /* Input responsivo */
+    .message-input {
+        font-size: 16px; /* Previne zoom no iOS */
+        padding: 12px 45px 12px 12px;
+    }
+    
+    /* Sidebar links mobile */
+    .company-links {
+        padding: 12px;
+    }
+    
+    .link-item {
+        padding: 10px;
+        font-size: 13px;
+    }
+    
+    /* Chat list mobile */
+    .chat-list {
+        padding: 0 15px 15px;
+    }
+    
+    .chat-item {
+        padding: 14px;
+        margin-bottom: 6px;
+    }
+    
+    /* Login mobile */
+    .login-box {
+        margin: 20px;
+        padding: 30px 20px;
+    }
+    
+    /* Previne scroll horizontal */
+    body {
+        overflow-x: hidden;
+    }
+    
+    /* Touch friendly */
+    button, .chat-item, .lead-card, .link-item {
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+    }
+}
+
+/* Landscape mobile */
+@media (max-width: 768px) and (orientation: landscape) {
+    .messages-container {
+        height: calc(100vh - 140px);
+    }
+    
+    .header {
+        height: 50px;
+    }
+    
+    .main-content {
+        padding-top: 50px;
+    }
+    
+    .chat-area, .leads-view {
+        top: 50px;
+        height: calc(100vh - 50px);
+    }
+}
+
+/* Melhorias para gráficos em telas pequenas */
+@media (max-width: 480px) {
+    .chart-container {
+        position: relative;
+        width: 100%;
+        padding-bottom: 75%; /* Aspect ratio 4:3 */
+        height: 0;
+        overflow: hidden;
+    }
+    
+    .chart-container canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100% !important;
+        height: 100% !important;
+    }
+}
+
+/* iOS specific fixes */
+@supports (-webkit-touch-callout: none) {
+    .input-area {
+        padding-bottom: env(safe-area-inset-bottom, 10px);
+    }
+    
+    .sidebar {
+        padding-bottom: env(safe-area-inset-bottom, 0);
+    }
+}
+
+/* Animações suaves */
+* {
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Fix para teclado mobile */
+.input-area {
+    position: sticky;
+    bottom: 0;
+}
