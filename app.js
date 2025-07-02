@@ -8,7 +8,7 @@ let isLeadsView = false;
 
 // API Base URL - Use o endereço completo quando abrir como arquivo
 const API_URL = window.location.protocol === 'file:' 
-    ? 'http://127.0.0.1:8000/api'
+    ? 'http://127.0.0.1:8080/api'
     : '/api';
 
 // Initialize app
