@@ -718,27 +718,28 @@ def update_chat_title(username, chat_id):
                 'message': 'Título não pode estar vazio'
             }), 400
         
-        updated = False
-        for chat in chats_storage.get(username, []):
-            if str(chat['id']) == str(chat_id):
-                chat['title'] = new_title
-                updated = True
-                log_activity(username, "UPDATE_CHAT_TITLE", f"New title: {new_title}")
-                break
+        db = get_db()
+        chat = db.query(Chat).filter_by(id=int(chat_id)).first()
         
-        if not updated:
-            return jsonify({
-                'success': False,
-                'message': 'Conversa não encontrada'
-            }), 404
+        if chat:
+            chat.title = new_title
+            db.commit()
+            log_activity(username, "UPDATE_CHAT_TITLE", f"New title: {new_title}")
+            return jsonify({'success': True})
         
-        return jsonify({'success': True})
+        return jsonify({
+            'success': False,
+            'message': 'Conversa não encontrada'
+        }), 404
+        
     except Exception as e:
         print(f"Erro ao atualizar título: {e}")
         return jsonify({
             'success': False,
             'message': 'Erro ao atualizar título'
         }), 500
+    finally:
+        close_db()
 
 @app.route('/api/generate-presentation', methods=['POST'])
 @require_auth
@@ -916,23 +917,23 @@ def delete_user(username):
 @require_auth
 def get_user_chats(username):
     try:
-        if username not in USERS:
+        db = get_db()
+        user = db.query(User).filter_by(username=username).first()
+        
+        if not user:
             return jsonify({
                 'success': False,
                 'message': 'Usuário não encontrado'
             }), 404
         
-        chats = chats_storage.get(username, [])
-        
-        # Resumir chats para lista
         chats_summary = []
-        for chat in chats:
+        for chat in user.chats:
             chats_summary.append({
-                'id': chat['id'],
-                'title': chat['title'],
-                'messagesCount': len(chat['messages']),
-                'createdAt': chat['createdAt'],
-                'lastMessage': chat['messages'][-1]['content'][:100] if chat['messages'] else ''
+                'id': chat.id,
+                'title': chat.title,
+                'messagesCount': len(chat.messages),
+                'createdAt': chat.created_at.isoformat(),
+                'lastMessage': chat.messages[-1].content[:100] if chat.messages else ''
             })
         
         return jsonify({
@@ -945,6 +946,8 @@ def get_user_chats(username):
             'success': False,
             'message': 'Erro ao carregar conversas'
         }), 500
+    finally:
+        close_db()
 
 @app.route('/api/admin/users/<username>/chats/<chat_id>', methods=['GET'])
 @require_auth
@@ -1086,7 +1089,107 @@ def generate_user_report(username):
             'success': False,
             'message': 'Erro ao gerar relatório'
         }), 500
+# ROTAS DE LEADS
 
+@app.route('/api/leads/<username>', methods=['GET'])
+@require_auth
+def get_user_leads(username):
+    try:
+        db = get_db()
+        user = db.query(User).filter_by(username=username).first()
+        
+        if not user:
+            return jsonify({'success': False, 'message': 'Usuário não encontrado'}), 404
+        
+        leads_data = []
+        for lead in user.leads:
+            leads_data.append({
+                'id': lead.id,
+                'name': lead.name,
+                'phone': lead.phone,
+                'email': lead.email,
+                'status': lead.status,
+                'value': lead.value,
+                'product': lead.product,
+                'notes': lead.notes,
+                'createdAt': lead.created_at.isoformat(),
+                'updatedAt': lead.updated_at.isoformat()
+            })
+        
+        return jsonify({
+            'success': True,
+            'leads': leads_data
+        })
+    except Exception as e:
+        print(f"Erro ao buscar leads: {e}")
+        return jsonify({'success': False, 'message': 'Erro ao carregar leads'}), 500
+    finally:
+        close_db()
+
+@app.route('/api/leads/<username>', methods=['POST'])
+@require_auth
+def create_lead(username):
+    try:
+        data = request.json
+        
+        db = get_db()
+        user = db.query(User).filter_by(username=username).first()
+        
+        if not user:
+            return jsonify({'success': False, 'message': 'Usuário não encontrado'}), 404
+        
+        new_lead = Lead(
+            user_id=user.id,
+            name=data.get('name'),
+            phone=data.get('phone'),
+            email=data.get('email'),
+            status=data.get('status'),
+            value=float(data.get('value', 0)),
+            product=data.get('product'),
+            notes=data.get('notes')
+        )
+        
+        db.add(new_lead)
+        db.commit()
+        
+        return jsonify({
+            'success': True,
+            'lead': {
+                'id': new_lead.id,
+                'name': new_lead.name,
+                'phone': new_lead.phone,
+                'createdAt': new_lead.created_at.isoformat()
+            }
+        })
+    except Exception as e:
+        print(f"Erro ao criar lead: {e}")
+        return jsonify({'success': False, 'message': 'Erro ao criar lead'}), 500
+    finally:
+        close_db()
+
+@app.route('/api/leads/<username>/<lead_id>', methods=['DELETE'])
+@require_auth
+def delete_lead(username, lead_id):
+    try:
+        db = get_db()
+        user = db.query(User).filter_by(username=username).first()
+        
+        if not user:
+            return jsonify({'success': False, 'message': 'Usuário não encontrado'}), 404
+        
+        lead = db.query(Lead).filter_by(id=int(lead_id), user_id=user.id).first()
+        
+        if lead:
+            db.delete(lead)
+            db.commit()
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"Erro ao deletar lead: {e}")
+        return jsonify({'success': False, 'message': 'Erro ao deletar lead'}), 500
+    finally:
+        close_db()
+        
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Endpoint para verificar saúde do servidor"""
