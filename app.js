@@ -690,96 +690,145 @@ currency: 'BRL'
 }).format(value);
 }
 
+// SUBSTITUA A FUNÇÃO sendMessage (linha 626) POR ESTA VERSÃO CORRIGIDA:
+
 // Send message
 async function sendMessage() {
-const messageInput = document.getElementById('messageInput');
-const message = messageInput.value.trim();
-
-if (!message || !currentChatId) return;
-
-const sendBtn = document.getElementById('sendBtn');
-sendBtn.disabled = true;
-messageInput.disabled = true;
-
-// Add user message to chat with files
-const currentChat = chats.find(chat => chat.id === currentChatId);
-const userMessage = {
-role: 'user',
-content: message,
-timestamp: new Date().toISOString()
-};
-
-if (selectedFiles.length > 0) {
-userMessage.files = selectedFiles.map(f => ({
-name: f.name,
-type: f.type,
-size: f.size
-}));
+    console.log('=== INÍCIO sendMessage ===');
+    
+    try {
+        const messageInput = document.getElementById('messageInput');
+        if (!messageInput) {
+            console.error('messageInput não encontrado!');
+            return;
+        }
+        
+        const message = messageInput.value.trim();
+        console.log('Mensagem:', message);
+        
+        if (!message) {
+            console.log('Mensagem vazia');
+            return;
+        }
+        
+        if (!currentChatId) {
+            console.log('Nenhum chat selecionado');
+            alert('Por favor, crie uma nova conversa primeiro');
+            return;
+        }
+        
+        const sendBtn = document.getElementById('sendBtn');
+        if (sendBtn) sendBtn.disabled = true;
+        messageInput.disabled = true;
+        
+        // Busca o chat atual
+        const currentChat = chats.find(chat => chat.id === currentChatId);
+        if (!currentChat) {
+            console.error('Chat não encontrado para ID:', currentChatId);
+            alert('Erro: Chat não encontrado');
+            if (sendBtn) sendBtn.disabled = false;
+            messageInput.disabled = false;
+            return;
+        }
+        
+        // Cria mensagem do usuário
+        const userMessage = {
+            role: 'user',
+            content: message,
+            timestamp: new Date().toISOString()
+        };
+        
+        if (selectedFiles && selectedFiles.length > 0) {
+            userMessage.files = selectedFiles.map(f => ({
+                name: f.name,
+                type: f.type,
+                size: f.size
+            }));
+        }
+        
+        // Adiciona mensagem do usuário ao chat
+        if (!currentChat.messages) {
+            currentChat.messages = [];
+        }
+        currentChat.messages.push(userMessage);
+        
+        // Limpa o input
+        messageInput.value = '';
+        autoResizeTextarea(messageInput);
+        
+        // Renderiza as mensagens
+        renderMessages();
+        
+        try {
+            // Envia para o servidor
+            console.log('Enviando para servidor...');
+            const response = await fetch(`${API_URL}/message`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${currentUser.token || ''}`
+                },
+                body: JSON.stringify({
+                    username: currentUser.username,
+                    chatId: currentChatId,
+                    message: message,
+                    files: selectedFiles || []
+                })
+            });
+            
+            console.log('Response status:', response.status);
+            const data = await response.json();
+            console.log('Response data:', data);
+            
+            if (data.success) {
+                // Adiciona resposta da IA
+                currentChat.messages.push({
+                    role: 'assistant',
+                    content: data.response,
+                    timestamp: new Date().toISOString(),
+                    chart: data.chart
+                });
+                
+                renderMessages();
+                
+                // Atualiza título se for primeira mensagem
+                if (currentChat.messages.length === 2) {
+                    currentChat.title = message.substring(0, 50) + (message.length > 50 ? '...' : '');
+                    renderChatList();
+                }
+                
+                // Limpa arquivos
+                selectedFiles = [];
+                updateFilePreview();
+                const fileInput = document.getElementById('fileInput');
+                if (fileInput) fileInput.value = '';
+            } else {
+                console.error('Erro do servidor:', data.message);
+                alert('Erro ao enviar mensagem: ' + (data.message || 'Erro desconhecido'));
+                // Remove a mensagem do usuário se falhou
+                currentChat.messages.pop();
+                renderMessages();
+            }
+        } catch (error) {
+            console.error('Erro na requisição:', error);
+            alert('Erro de conexão: ' + error.message);
+            // Remove a mensagem do usuário se falhou
+            currentChat.messages.pop();
+            renderMessages();
+        }
+        
+        // Reabilita os controles
+        if (sendBtn) sendBtn.disabled = false;
+        messageInput.disabled = false;
+        messageInput.focus();
+        
+    } catch (error) {
+        console.error('Erro geral em sendMessage:', error);
+        console.error('Stack:', error.stack);
+    }
+    
+    console.log('=== FIM sendMessage ===');
 }
-
-currentChat.messages.push(userMessage);
-
-messageInput.value = '';
-autoResizeTextarea(messageInput);
-renderMessages();
-
-try {
-const response = await fetch(`${API_URL}/message`, {
-method: 'POST',
-headers: {
-'Content-Type': 'application/json',
-'Authorization': `Bearer ${currentUser.token}`
-},
-body: JSON.stringify({
-username: currentUser.username,
-chatId: currentChatId,
-message: message,
-files: selectedFiles
-})
-});
-
-const data = await response.json();
-
-if (data.success) {
-// Add AI response
-currentChat.messages.push({
-role: 'assistant',
-content: data.response,
-timestamp: new Date().toISOString(),
-chart: data.chart
-});
-
-renderMessages();
-
-// Update chat title if first message
-if (currentChat.messages.length === 2) {
-currentChat.title = message.substring(0, 50) + (message.length > 50 ? '...' : '');
-renderChatList();
-}
-
-// Clear files after successful response
-selectedFiles = [];
-updateFilePreview();
-document.getElementById('fileInput').value = '';
-} else {
-alert('Erro ao enviar mensagem');
-// Remove the user message if failed
-currentChat.messages.pop();
-renderMessages();
-}
-} catch (error) {
-console.error('Send error:', error);
-alert('Erro de conexão');
-// Remove the user message if failed
-currentChat.messages.pop();
-renderMessages();
-}
-
-sendBtn.disabled = false;
-messageInput.disabled = false;
-messageInput.focus();
-}
-
 // Handle input keydown
 function handleInputKeydown(event) {
 if (event.key === 'Enter' && !event.shiftKey) {
