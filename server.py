@@ -24,6 +24,7 @@ import base64
 from io import BytesIO
 import secrets
 from functools import wraps
+from database import get_db, close_db, User, Chat, Message, Lead
 
 app = Flask(__name__)
 CORS(app)
@@ -37,16 +38,7 @@ ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
 # Cliente Anthropic
 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
-# Usuários do sistema
-USERS = {
-    "admin": {"password": "horizont2025", "role": "admin", "name": "Administrador", "cpf": "000.000.000-00"},
-    "carlos": {"password": "123456", "role": "user", "name": "Carlos Silva", "cpf": "123.456.789-00"},
-    "ana": {"password": "123456", "role": "user", "name": "Ana Santos", "cpf": "987.654.321-00"},
-    "paulo": {"password": "123456", "role": "user", "name": "Paulo Costa", "cpf": "456.789.123-00"}
-}
-
 # Armazenamento em memória (em produção, use um banco de dados)
-chats_storage = {}
 active_sessions = {}  # Para controle de sessão
 
 # Prompt padrão do sistema
@@ -411,26 +403,27 @@ def login():
                 'message': 'Usuário e senha são obrigatórios'
             }), 400
         
-        if username in USERS and USERS[username]['password'] == password:
-            # Inicializar storage para o usuário
-            if username not in chats_storage:
-                chats_storage[username] = []
-            
-            # Gerar token de sessão (simplificado)
+        # Busca no banco de dados
+        db = get_db()
+        user = db.query(User).filter_by(username=username, password=password).first()
+        
+        if user:
+            # Gerar token de sessão
             session_token = secrets.token_hex(16)
             active_sessions[session_token] = {
-                'username': username,
+                'username': user.username,
+                'user_id': user.id,
                 'login_time': datetime.now().isoformat(),
-                'role': USERS[username]['role']
+                'role': user.role
             }
             
-            log_activity(username, "LOGIN", f"Successful login - Role: {USERS[username]['role']}")
+            log_activity(user.username, "LOGIN", f"Successful login - Role: {user.role}")
             
             return jsonify({
                 'success': True,
-                'username': username,
-                'role': USERS[username]['role'],
-                'name': USERS[username].get('name', username),
+                'username': user.username,
+                'role': user.role,
+                'name': user.name,
                 'token': session_token,
                 'message': 'Login realizado com sucesso'
             })
@@ -447,7 +440,9 @@ def login():
             'success': False,
             'message': 'Erro interno do servidor'
         }), 500
-
+    finally:
+        close_db()
+        
 @app.route('/api/chats/<username>', methods=['GET'])
 @require_auth
 def get_chats(username):
