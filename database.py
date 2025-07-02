@@ -6,7 +6,7 @@ from sqlalchemy.orm import sessionmaker, relationship, scoped_session
 import json
 
 # Pega a URL do banco do Railway automaticamente
-DATABASE_URL = 'sqlite:///horizont.db'
+DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///horizont.db')
 # Corrige URL para PostgreSQL se necessário
 if DATABASE_URL.startswith('postgres://'):
     DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
@@ -82,13 +82,11 @@ Base.metadata.create_all(bind=engine)
 
 # Funções auxiliares
 def get_db():
-    db = SessionLocal()
-    try:
-        return db
-    finally:
-        pass  # Não fecha aqui, deixa para o cleanup
+    """Retorna uma sessão do banco de dados"""
+    return SessionLocal()
 
 def close_db():
+    """Remove a sessão do banco de dados"""
     SessionLocal.remove()
 
 # Inicializa usuários padrão
@@ -97,6 +95,7 @@ def init_default_users():
     try:
         # Verifica se já existem usuários
         if db.query(User).first():
+            print("✅ Usuários já existem no banco de dados")
             return
         
         # Cria usuários padrão
@@ -114,7 +113,7 @@ def init_default_users():
         print("✅ Usuários padrão criados no banco de dados!")
         
     except Exception as e:
-        print(f"Erro ao criar usuários padrão: {e}")
+        print(f"❌ Erro ao criar usuários padrão: {e}")
         db.rollback()
     finally:
         db.close()
@@ -131,6 +130,15 @@ def migrate_existing_data(chats_storage):
                 continue
             
             for chat_data in chats:
+                # Verifica se o chat já existe
+                existing_chat = db.query(Chat).filter_by(
+                    user_id=user.id,
+                    title=chat_data.get('title', 'Conversa sem título')
+                ).first()
+                
+                if existing_chat:
+                    continue
+                
                 # Cria o chat
                 chat = Chat(
                     user_id=user.id,
@@ -156,7 +164,7 @@ def migrate_existing_data(chats_storage):
         print("✅ Dados migrados para o banco de dados!")
         
     except Exception as e:
-        print(f"Erro na migração: {e}")
+        print(f"❌ Erro na migração: {e}")
         db.rollback()
     finally:
         db.close()
