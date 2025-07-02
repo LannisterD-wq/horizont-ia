@@ -6,10 +6,12 @@ let selectedFiles = [];
 let userLeads = [];
 let isLeadsView = false;
 
-// API Base URL - Use o endereço completo quando abrir como arquivo
-const API_URL = window.location.protocol === 'file:' 
-    ? 'http://127.0.0.1:8000/api'
-    : '/api';
+// Se estiver no Railway, use a URL completa
+const API_URL = window.location.hostname.includes('railway.app') 
+    ? `${window.location.origin}/api`
+    : window.location.protocol === 'file:' 
+        ? 'http://127.0.0.1:8000/api'
+        : '/api';
 
 // Debug - remover depois
 console.log('API_URL:', API_URL);
