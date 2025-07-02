@@ -447,12 +447,35 @@ def login():
 @require_auth
 def get_chats(username):
     try:
-        if username not in chats_storage:
-            chats_storage[username] = []
+        db = get_db()
+        user = db.query(User).filter_by(username=username).first()
+        
+        if not user:
+            return jsonify({'success': False, 'message': 'Usuário não encontrado'}), 404
+        
+        chats_data = []
+        for chat in user.chats:
+            chat_dict = {
+                'id': chat.id,
+                'title': chat.title,
+                'createdAt': chat.created_at.isoformat(),
+                'messages': []
+            }
+            
+            for msg in chat.messages:
+                chat_dict['messages'].append({
+                    'role': msg.role,
+                    'content': msg.content,
+                    'timestamp': msg.created_at.isoformat(),
+                    'files': msg.files,
+                    'chart': msg.chart
+                })
+            
+            chats_data.append(chat_dict)
         
         return jsonify({
             'success': True,
-            'chats': chats_storage[username]
+            'chats': chats_data
         })
     except Exception as e:
         print(f"Erro ao buscar chats: {e}")
@@ -460,6 +483,8 @@ def get_chats(username):
             'success': False,
             'message': 'Erro ao carregar conversas'
         }), 500
+    finally:
+        close_db()
 
 @app.route('/api/chats/<username>', methods=['POST'])
 @require_auth
@@ -467,22 +492,33 @@ def create_chat(username):
     try:
         data = request.json
         
-        if username not in chats_storage:
-            chats_storage[username] = []
+        db = get_db()
+        user = db.query(User).filter_by(username=username).first()
         
-        new_chat = {
-            'id': datetime.now().timestamp(),
-            'title': data.get('title', 'Nova Conversa'),
+        if not user:
+            return jsonify({'success': False, 'message': 'Usuário não encontrado'}), 404
+        
+        new_chat = Chat(
+            user_id=user.id,
+            title=data.get('title', 'Nova Conversa')
+        )
+        
+        db.add(new_chat)
+        db.commit()
+        
+        log_activity(username, "CREATE_CHAT", f"Chat: {new_chat.title}")
+        
+        # Retorna o chat criado
+        chat_data = {
+            'id': new_chat.id,
+            'title': new_chat.title,
             'messages': [],
-            'createdAt': datetime.now().isoformat()
+            'createdAt': new_chat.created_at.isoformat()
         }
-        
-        chats_storage[username].append(new_chat)
-        log_activity(username, "CREATE_CHAT", f"Chat: {new_chat['title']}")
         
         return jsonify({
             'success': True,
-            'chat': new_chat
+            'chat': chat_data
         })
     except Exception as e:
         print(f"Erro ao criar chat: {e}")
@@ -490,21 +526,25 @@ def create_chat(username):
             'success': False,
             'message': 'Erro ao criar conversa'
         }), 500
+    finally:
+        close_db()
 
 @app.route('/api/chats/<username>/<chat_id>', methods=['DELETE'])
 @require_auth
 def delete_chat(username, chat_id):
     try:
-        if username in chats_storage:
-            original_count = len(chats_storage[username])
-            chats_storage[username] = [
-                chat for chat in chats_storage[username] 
-                if str(chat['id']) != chat_id
-            ]
-            deleted = original_count > len(chats_storage[username])
-            
-            if deleted:
-                log_activity(username, "DELETE_CHAT", f"Chat ID: {chat_id}")
+        db = get_db()
+        user = db.query(User).filter_by(username=username).first()
+        
+        if not user:
+            return jsonify({'success': False, 'message': 'Usuário não encontrado'}), 404
+        
+        chat = db.query(Chat).filter_by(id=int(chat_id), user_id=user.id).first()
+        
+        if chat:
+            db.delete(chat)
+            db.commit()
+            log_activity(username, "DELETE_CHAT", f"Chat ID: {chat_id}")
         
         return jsonify({'success': True})
     except Exception as e:
@@ -513,6 +553,8 @@ def delete_chat(username, chat_id):
             'success': False,
             'message': 'Erro ao deletar conversa'
         }), 500
+    finally:
+        close_db()
 
 @app.route('/api/message', methods=['POST'])
 @require_auth
@@ -530,65 +572,44 @@ def send_message():
                 'message': 'Dados incompletos'
             }), 400
         
-        # Processar arquivos anexados
-        file_context = ""
-        for file in files:
-            if file.get('type') == 'application/pdf':
-                pdf_text = extract_pdf_text(file.get('data'))
-                if pdf_text:
-                    file_context += f"\n\nConteúdo do PDF {file.get('name')}:\n{pdf_text[:3000]}..."
+        db = get_db()
         
-        # Adicionar contexto do arquivo à mensagem
-        full_message = message
-        if file_context:
-            full_message += f"\n\n[Arquivo anexado]{file_context}"
-        
-        # Adicionar mensagem do usuário ao chat
-        chat_found = False
-        for chat in chats_storage.get(username, []):
-            if str(chat['id']) == str(chat_id):
-                chat_found = True
-                user_message = {
-                    'role': 'user',
-                    'content': message,  # Salvar mensagem original sem arquivo
-                    'timestamp': datetime.now().isoformat()
-                }
-                if files:
-                    user_message['files'] = [{'name': f['name'], 'size': f['size'], 'type': f['type']} for f in files]
-                
-                chat['messages'].append(user_message)
-                
-                # Atualizar título se for a primeira mensagem
-                if len(chat['messages']) == 1:
-                    chat['title'] = message[:50] + '...' if len(message) > 50 else message
-                
-                break
-        
-        if not chat_found:
+        # Busca o chat
+        chat = db.query(Chat).filter_by(id=int(chat_id)).first()
+        if not chat:
             return jsonify({
                 'success': False,
                 'message': 'Conversa não encontrada'
             }), 404
         
-        # Construir histórico de mensagens
-        messages = []
-        for chat in chats_storage.get(username, []):
-            if str(chat['id']) == str(chat_id):
-                for msg in chat['messages']:
-                    if msg['role'] == 'user':
-                        messages.append({
-                            'role': 'user',
-                            'content': msg['content']
-                        })
-                    elif msg['role'] == 'assistant':
-                        messages.append({
-                            'role': 'assistant',
-                            'content': msg['content']
-                        })
+        # Adiciona mensagem do usuário
+        user_message = Message(
+            chat_id=chat.id,
+            role='user',
+            content=message,
+            files=files if files else None
+        )
+        db.add(user_message)
         
-        # Adicionar contexto de arquivo apenas na última mensagem para o Claude
-        if messages and file_context:
-            messages[-1]['content'] = full_message
+        # Atualiza título se for a primeira mensagem
+        if len(chat.messages) == 0:
+            chat.title = message[:50] + '...' if len(message) > 50 else message
+        
+        db.commit()
+        
+        # Prepara contexto para o Claude
+        messages = []
+        for msg in chat.messages[-10:]:  # Últimas 10 mensagens
+            messages.append({
+                'role': msg.role,
+                'content': msg.content
+            })
+        
+        # Adiciona mensagem atual
+        messages.append({
+            'role': 'user',
+            'content': message
+        })
         
         # Chamar API do Claude
         try:
@@ -596,7 +617,7 @@ def send_message():
                 model="claude-3-5-sonnet-20241022",
                 max_tokens=3000,
                 system=get_horizont_prompt(),
-                messages=messages[-10:]  # Limitar histórico para evitar token limit
+                messages=messages
             )
             
             ai_response = response.content[0].text
@@ -612,20 +633,15 @@ def send_message():
         # Processar resposta para extrair dados de gráfico
         chart_data, clean_response = parse_chart_from_response(ai_response)
         
-        # Adicionar resposta da IA ao chat
-        for chat in chats_storage.get(username, []):
-            if str(chat['id']) == str(chat_id):
-                ai_message = {
-                    'role': 'assistant',
-                    'content': clean_response,
-                    'timestamp': datetime.now().isoformat()
-                }
-                if chart_data:
-                    ai_message['chart'] = chart_data
-                    log_activity(username, "CHART_GENERATED", f"Chart type: {chart_data.get('type', 'unknown')}")
-                
-                chat['messages'].append(ai_message)
-                break
+        # Adiciona resposta da IA
+        ai_message = Message(
+            chat_id=chat.id,
+            role='assistant',
+            content=clean_response,
+            chart=chart_data
+        )
+        db.add(ai_message)
+        db.commit()
         
         return jsonify({
             'success': True,
@@ -639,6 +655,8 @@ def send_message():
             'success': False,
             'message': 'Erro ao processar mensagem'
         }), 500
+    finally:
+        close_db()
 
 def generate_fallback_response(user_message):
     """Gera resposta de fallback quando a API falha"""
