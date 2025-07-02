@@ -24,7 +24,7 @@ import base64
 from io import BytesIO
 import secrets
 from functools import wraps
-from database import get_db, close_db, User, Chat, Message, Lead, migrate_existing_data
+from database import get_db, close_db, User, Chat, Message, Lead
 
 app = Flask(__name__)
 CORS(app)
@@ -44,7 +44,6 @@ else:
 
 # Armazenamento em memória para sessões
 active_sessions = {}
-chats_storage = {}  # Para migração se necessário
 
 # Prompt padrão do sistema
 system_prompt = """
@@ -712,7 +711,7 @@ Como posso ajudar você a apresentar este produto para seu cliente?
 Como posso ajudar você a converter esse cliente?
 """
     else:
-        return f"""
+        return """
 Olá! Sou o Consultor Amigo da Horizont Investimentos.
 
 Nossos principais produtos:
@@ -980,6 +979,56 @@ def get_user_chats(username):
     finally:
         close_db()
 
+@app.route('/api/admin/users/<username>/chats/<chat_id>', methods=['GET'])
+@require_auth
+def get_user_chat_details(username, chat_id):
+    try:
+        db = get_db()
+        user = db.query(User).filter_by(username=username).first()
+        
+        if not user:
+            return jsonify({
+                'success': False,
+                'message': 'Usuário não encontrado'
+            }), 404
+        
+        chat = db.query(Chat).filter_by(id=int(chat_id), user_id=user.id).first()
+        
+        if not chat:
+            return jsonify({
+                'success': False,
+                'message': 'Chat não encontrado'
+            }), 404
+        
+        chat_data = {
+            'id': chat.id,
+            'title': chat.title,
+            'createdAt': chat.created_at.isoformat(),
+            'messages': []
+        }
+        
+        for msg in chat.messages:
+            chat_data['messages'].append({
+                'role': msg.role,
+                'content': msg.content,
+                'timestamp': msg.created_at.isoformat(),
+                'files': msg.files,
+                'chart': msg.chart
+            })
+        
+        return jsonify({
+            'success': True,
+            'chat': chat_data
+        })
+    except Exception as e:
+        print(f"Erro ao buscar detalhes do chat: {e}")
+        return jsonify({
+            'success': False,
+            'message': 'Erro ao carregar detalhes'
+        }), 500
+    finally:
+        close_db()
+
 @app.route('/api/admin/prompt', methods=['GET'])
 @require_auth
 def get_prompt():
@@ -1028,6 +1077,73 @@ def update_prompt():
             'success': False,
             'message': 'Erro ao salvar configurações'
         }), 500
+
+@app.route('/api/admin/report/<username>', methods=['GET'])
+@require_auth
+def generate_user_report(username):
+    """Gera relatório detalhado de um representante"""
+    try:
+        db = get_db()
+        user = db.query(User).filter_by(username=username).first()
+        
+        if not user:
+            return jsonify({
+                'success': False,
+                'message': 'Usuário não encontrado'
+            }), 404
+        
+        # Estatísticas dos chats
+        total_messages = 0
+        total_charts = 0
+        all_values = []
+        
+        for chat in user.chats:
+            total_messages += len(chat.messages)
+            for msg in chat.messages:
+                if msg.chart:
+                    total_charts += 1
+                if msg.role == 'assistant' and 'R$' in msg.content:
+                    # Extrai valores monetários da mensagem
+                    valores = re.findall(r'R\$\s*([\d.,]+)', msg.content)
+                    all_values.extend(valores)
+        
+        # Atividade por mês
+        monthly_activity = {}
+        for chat in user.chats:
+            month = chat.created_at.strftime('%Y-%m')
+            monthly_activity[month] = monthly_activity.get(month, 0) + 1
+        
+        report = {
+            'username': username,
+            'name': user.name,
+            'cpf': user.cpf,
+            'totalChats': len(user.chats),
+            'totalMessages': total_messages,
+            'totalCharts': total_charts,
+            'averageMessagesPerChat': round(total_messages / len(user.chats), 1) if user.chats else 0,
+            'createdChats': [
+                {
+                    'title': chat.title,
+                    'date': chat.created_at.isoformat(),
+                    'messagesCount': len(chat.messages)
+                } for chat in user.chats
+            ],
+            'mentionedValues': all_values[:20],  # Top 20 valores
+            'monthlyActivity': monthly_activity
+        }
+        
+        return jsonify({
+            'success': True,
+            'report': report
+        })
+    except Exception as e:
+        print(f"Erro ao gerar relatório: {e}")
+        return jsonify({
+            'success': False,
+            'message': 'Erro ao gerar relatório'
+        }), 500
+    finally:
+        close_db()
 
 # ROTAS DE LEADS - CORRIGIDAS
 
@@ -1202,10 +1318,20 @@ def delete_lead(username, lead_id):
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Endpoint para verificar saúde do servidor"""
+    try:
+        # Testa conexão com banco
+        db = get_db()
+        db.query(User).first()
+        db_status = 'connected'
+    except:
+        db_status = 'error'
+    finally:
+        close_db()
+    
     return jsonify({
         'status': 'healthy',
         'timestamp': datetime.now().isoformat(),
-        'database': 'connected',
+        'database': db_status,
         'version': '1.0.0',
         'logo_exists': os.path.exists('logo.png'),
         'anthropic_configured': bool(ANTHROPIC_API_KEY)
@@ -1233,7 +1359,7 @@ if __name__ == '__main__':
     print("🔧 Modo produção ativo")
     
     print("\n✅ Status do sistema:")
-    print(f"   - 🗄️ Banco de dados: {'PostgreSQL' if 'postgresql' in DATABASE_URL else 'SQLite'}")
+    print(f"   - 🗄️ Banco de dados: {'PostgreSQL' if 'postgresql' in os.environ.get('DATABASE_URL', '') else 'SQLite'}")
     print(f"   - 🤖 API Anthropic: {'Configurada' if ANTHROPIC_API_KEY else 'Não configurada'}")
     print(f"   - 🖼️ Logo: {'Encontrada' if os.path.exists('logo.png') else 'Não encontrada'}")
     print(f"   - 📊 Sistema de leads: Ativo")
