@@ -544,6 +544,7 @@ font-size: 16px;
 resize: none;
 max-height: 120px;
 line-height: 1.4;
+overflow-y: auto;
 }
 
 .message-input:focus {
@@ -1090,6 +1091,67 @@ background: rgba(255, 255, 255, 0.2);
 
 /* Responsive Design */
 @media (max-width: 768px) {
+.input-area {
+        background: rgba(20, 20, 20, 0.98);  /* Mais opaco no mobile */
+        backdrop-filter: blur(10px);
+        border-top: 2px solid rgba(255, 215, 0, 0.3);  /* Borda mais visível */
+    }
+    
+    .message-input {
+        max-height: 80px;  /* Menor no mobile */
+        overflow-y: auto;  /* Scroll interno */
+    }
+    
+    /* Quando o teclado está aberto */
+    body.keyboard-open .input-area {
+        background: rgba(20, 20, 20, 1);  /* Totalmente opaco */
+    }
+}
+
+.artifact-header {
+flex-direction: column;
+text-align: center;
+gap: 10px;
+}
+    
+.artifact-header h3 {
+font-size: 14px;
+}
+    
+.artifact-content {
+padding: 15px;
+max-height: 400px;
+font-size: 14px;
+}
+    
+.artifact-copy-btn {
+        width: 100%;
+}
+/* Estilos para gráfico dentro do artefato */
+.artifact-chart-container {
+margin: 20px 0;
+padding: 15px;
+background: rgba(0, 0, 0, 0.2);
+border-radius: 8px;
+border: 1px solid rgba(255, 215, 0, 0.2);
+}
+    
+.artifact-chart-container canvas {
+max-width: 100%;
+height: 250px !important;
+}
+    
+.artifact-content .artifact-chart-container {
+width: 100%;
+box-sizing: border-box;
+}
+    
+.artifact-container {
+max-width: 100%;
+overflow-x: auto;
+    
+}   
+    
 .sidebar {
 position: fixed;
 left: 0;
@@ -1276,51 +1338,7 @@ padding-bottom: 100px;
     transform: translateY(-2px);
 }
 
-/* Responsivo para mobile */
-@media (max-width: 768px) {
-    .artifact-header {
-        flex-direction: column;
-        text-align: center;
-        gap: 10px;
-    }
-    
-    .artifact-header h3 {
-        font-size: 14px;
-    }
-    
-    .artifact-content {
-        padding: 15px;
-        max-height: 400px;
-        font-size: 14px;
-    }
-    
-    .artifact-copy-btn {
-        width: 100%;
-    }
-    /* Estilos para gráfico dentro do artefato */
-    .artifact-chart-container {
-        margin: 20px 0;
-        padding: 15px;
-        background: rgba(0, 0, 0, 0.2);
-        border-radius: 8px;
-        border: 1px solid rgba(255, 215, 0, 0.2);
-    }
-    
-    .artifact-chart-container canvas {
-        max-width: 100%;
-        height: 250px !important;
-    }
-    
-    .artifact-content .artifact-chart-container {
-        width: 100%;
-        box-sizing: border-box;
-    }
-    
-    .artifact-container {
-        max-width: 100%;
-        overflow-x: auto;
- }    
-    
+  
 </style>
 </head>
 <body>
