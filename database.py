@@ -1,26 +1,45 @@
 import os
+import sys
 from datetime import datetime
 from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, Float, ForeignKey, JSON
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship, scoped_session
 import json
 
+# CORREÇÃO: Garante que o banco seja criado na pasta do projeto
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_FILE = os.path.join(BASE_DIR, 'horizont.db')
+
+print(f"📁 Pasta do projeto: {BASE_DIR}")
+
 # Pega a URL do banco do Railway ou usa SQLite local
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 
-# Se não houver DATABASE_URL, usa SQLite
+# Se não houver DATABASE_URL, usa SQLite com caminho absoluto
 if not DATABASE_URL:
-    DATABASE_URL = 'sqlite:///horizont.db'
-    print("⚠️ DATABASE_URL não encontrada, usando SQLite local")
+    DATABASE_URL = f'sqlite:///{DB_FILE}'  # Usa caminho absoluto
+    print(f"📊 Usando SQLite local: {DB_FILE}")
+    
+    # Verifica se o arquivo já existe
+    if os.path.exists(DB_FILE):
+        size = os.path.getsize(DB_FILE) / 1024  # KB
+        print(f"✅ Banco existente encontrado ({size:.1f} KB)")
+    else:
+        print("📦 Novo banco de dados será criado")
 
 # Corrige URL para PostgreSQL se necessário
 if DATABASE_URL.startswith('postgres://'):
     DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
 
-print(f"📊 Conectando ao banco de dados...")
+print(f"🔗 String de conexão: {DATABASE_URL[:50]}...")
 
-# Configuração do SQLAlchemy
-engine = create_engine(DATABASE_URL)
+# Configuração do SQLAlchemy com echo para debug
+engine = create_engine(
+    DATABASE_URL,
+    echo=False,  # Mude para True se quiser ver os SQLs
+    connect_args={'check_same_thread': False} if 'sqlite' in DATABASE_URL else {}
+)
+
 SessionLocal = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
 Base = declarative_base()
 
@@ -89,8 +108,15 @@ class Lead(Base):
 try:
     Base.metadata.create_all(bind=engine)
     print("✅ Tabelas do banco de dados criadas/verificadas")
+    
+    # Verifica se o arquivo foi criado (para SQLite)
+    if 'sqlite' in DATABASE_URL and os.path.exists(DB_FILE):
+        print(f"✅ Arquivo do banco criado: {DB_FILE}")
+        
 except Exception as e:
     print(f"❌ Erro ao criar tabelas: {e}")
+    import traceback
+    traceback.print_exc()
 
 # Funções auxiliares
 def get_db():
@@ -109,6 +135,12 @@ def init_default_users():
         existing_users = db.query(User).count()
         if existing_users > 0:
             print(f"✅ {existing_users} usuários já existem no banco de dados")
+            
+            # Lista os usuários existentes
+            users = db.query(User).all()
+            print("👥 Usuários cadastrados:")
+            for user in users:
+                print(f"   - {user.username} ({user.name}) - Role: {user.role}")
             return
         
         # Cria usuários padrão
@@ -124,6 +156,10 @@ def init_default_users():
         
         db.commit()
         print("✅ Usuários padrão criados no banco de dados!")
+        
+        # Confirma criação
+        for user in default_users:
+            print(f"   ✓ {user.username} - senha: {user.password}")
         
     except Exception as e:
         print(f"❌ Erro ao criar usuários padrão: {e}")
@@ -183,7 +219,24 @@ def migrate_existing_data(chats_storage):
         db.close()
 
 # Inicializa o banco com usuários padrão
+if __name__ == "__main__":
+    print("\n" + "="*60)
+    print("INICIALIZANDO BANCO DE DADOS")
+    print("="*60)
+    
 try:
     init_default_users()
+    
+    # Verifica se o arquivo foi criado
+    if 'sqlite' in DATABASE_URL:
+        if os.path.exists(DB_FILE):
+            size = os.path.getsize(DB_FILE) / 1024
+            print(f"\n📊 Status final: Banco criado com sucesso!")
+            print(f"   📁 Arquivo: {DB_FILE}")
+            print(f"   📏 Tamanho: {size:.1f} KB")
+        else:
+            print("\n⚠️ AVISO: Arquivo do banco não foi criado!")
+            print("   Verifique permissões de escrita na pasta")
+            
 except Exception as e:
-    print(f"⚠️ Erro ao inicializar usuários: {e}")
+    print(f"⚠️ Erro ao inicializar: {e}")
