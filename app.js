@@ -1123,7 +1123,6 @@ renderChart(chartData, canvasId);
 };
 container.appendChild(expandBtn);
 }
-}
 
 const datasets = [];
 const years = Array.from({length: (chartData.years || 5) + 1}, (_, i) => i);
