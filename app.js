@@ -732,7 +732,7 @@ function renderMessages() {
         `;
 
         // Add share button for assistant messages with valuable content
-        if (msg.role === 'assistant' && (msg.content.includes('R) || msg.chart)) {
+        if (msg.role === 'assistant' && (msg.content.includes('R') || msg.chart)) {
             messageContent += `
                 <button class="share-btn" onclick="shareViaWhatsApp(${index})">
                     📱 Compartilhar no WhatsApp
