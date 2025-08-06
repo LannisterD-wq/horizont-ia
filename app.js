@@ -668,11 +668,8 @@ function renderMessages() {
         
         // NOVO: Substitui marcador do artefato se existir
         if (msg.artifact && processedContent.includes('{{ARTEFATO_AQUI}}')) {
-               // Gera um ID único para este artefato
-               const artifactId = `artifact-${currentChatId}-${index}`;
-               
                const artifactHtml = `
-                   <div class="artifact-container" id="${artifactId}">
+                   <div class="artifact-container">
                        <div class="artifact-header">
                            <span class="artifact-type">${msg.artifact.type || 'report'}</span>
                            <h3>${msg.artifact.title || 'Documento'}</h3>
@@ -685,58 +682,44 @@ function renderMessages() {
                        </div>
                    </div>
                `;
-               processedContent = processedContent.replace('{{ARTEFATO_AQUI}}', artifactHtml);
                
-               // Se tem gráfico, renderiza DENTRO do artefato após um delay
-               if (msg.chart && msg.artifact.content.includes('{{GRAFICO_AQUI}}')) {
-                   setTimeout(() => {
-                       const artifactElement = document.getElementById(artifactId);
-                       if (artifactElement) {
-                           const contentDiv = artifactElement.querySelector('.artifact-content');
-                           if (contentDiv) {
-                               // Cria container para o gráfico
-                               const chartHtml = `
-                                   <div class="artifact-chart-container">
-                                       <canvas id="artifact-chart-${artifactId}"></canvas>
-                                   </div>
-                               `;
-                               
-                               // Substitui o marcador pelo canvas
-                               const currentHtml = contentDiv.innerHTML;
-                               if (currentHtml.includes('{{GRAFICO_AQUI}}')) {
-                                   contentDiv.innerHTML = currentHtml.replace('{{GRAFICO_AQUI}}', chartHtml);
-                                   
-                                   // Renderiza o gráfico
-                                   setTimeout(() => {
-                                       const canvasElement = document.getElementById(`artifact-chart-${artifactId}`);
-                                       if (canvasElement) {
-                                           renderChart(msg.chart, `artifact-chart-${artifactId}`);
-                                       }
-                                   }, 100);
-                               }
-                           }
-                       }
-                   }, 200);
+               // Remove {{GRAFICO_AQUI}} do conteúdo do artefato
+               let cleanedArtifactHtml = artifactHtml;
+               if (artifactHtml.includes('{{GRAFICO_AQUI}}')) {
+                   cleanedArtifactHtml = artifactHtml.replace('{{GRAFICO_AQUI}}', 
+                       '<p style="color: #ffd700; text-align: center; margin: 20px 0;">[Gráfico exibido abaixo]</p>');
                }
+               
+               processedContent = processedContent.replace('{{ARTEFATO_AQUI}}', cleanedArtifactHtml);
            }
-
-        messageContent += processedContent;
-        messageContent += '</div>';
-
-        messageDiv.innerHTML = messageContent;
-        messagesContainer.appendChild(messageDiv);
-
-        // NOVO: Renderiza o gráfico após inserir o HTML
-        if (msg.chart) {
-            const chartId = `chart-${currentChatId}-${index}`;
-            setTimeout(() => {
-                // Verifica se o canvas existe antes de renderizar
-                if (document.getElementById(chartId)) {
-                    renderChart(msg.chart, chartId);
-                }
-            }, 100);
-        }
-    });
+           
+           // E renderize o gráfico SEPARADAMENTE como antes:
+           if (msg.chart) {
+               const chartId = `chart-${currentChatId}-${index}`;
+               setTimeout(() => {
+                   if (document.getElementById(chartId)) {
+                       renderChart(msg.chart, chartId);
+                   }
+               }, 100);
+           }
+           
+                   messageContent += processedContent;
+                   messageContent += '</div>';
+           
+                   messageDiv.innerHTML = messageContent;
+                   messagesContainer.appendChild(messageDiv);
+           
+                   // NOVO: Renderiza o gráfico após inserir o HTML
+                   if (msg.chart) {
+                       const chartId = `chart-${currentChatId}-${index}`;
+                       setTimeout(() => {
+                           // Verifica se o canvas existe antes de renderizar
+                           if (document.getElementById(chartId)) {
+                               renderChart(msg.chart, chartId);
+                           }
+                       }, 100);
+                   }
+               });
 
     // Scroll to bottom
     setTimeout(() => {
@@ -1025,8 +1008,14 @@ sendMessage();
 
 // Auto resize textarea
 function autoResizeTextarea(textarea) {
-textarea.style.height = 'auto';
-textarea.style.height = textarea.scrollHeight + 'px';
+    // Não expande no mobile, apenas usa scroll interno
+    if (window.innerWidth < 768) {
+        return;  // Não faz resize no mobile
+    }
+    
+    // Desktop continua expandindo
+    textarea.style.height = 'auto';
+    textarea.style.height = textarea.scrollHeight + 'px';
 }
 
 // Handle file select
