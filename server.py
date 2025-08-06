@@ -430,6 +430,38 @@ def extract_pdf_text(file_data):
     except Exception as e:
         print(f"Erro ao ler PDF: {e}")
         return ""
+def process_image_for_claude(file_data, file_type):
+    """Processa imagem para formato aceito pelo Claude"""
+    try:
+        # Remove o prefixo data:image/xxx;base64, se existir
+        if ',' in file_data:
+            base64_data = file_data.split(',')[1]
+        else:
+            base64_data = file_data
+            
+        # Determina o media_type correto
+        if 'jpeg' in file_type or 'jpg' in file_type:
+            media_type = 'image/jpeg'
+        elif 'png' in file_type:
+            media_type = 'image/png'
+        elif 'gif' in file_type:
+            media_type = 'image/gif'
+        elif 'webp' in file_type:
+            media_type = 'image/webp'
+        else:
+            media_type = file_type
+        
+        return {
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": media_type,
+                "data": base64_data
+            }
+        }
+    except Exception as e:
+        print(f"Erro ao processar imagem: {e}")
+        return None
 
 def parse_chart_from_response(text):
     """Extrai dados de gráfico customizado da resposta do Claude"""
@@ -690,20 +722,33 @@ def send_message():
                 'message': 'Dados incompletos'
             }), 400
         
-        # Processar arquivos anexados ANTES de salvar
+        # Processar arquivos anexados
         file_context = ""
-        for file in files:
-            if file.get('type') == 'application/pdf':
-                pdf_text = extract_pdf_text(file.get('data'))
-                if pdf_text:
-                    file_context += f"\n\nConteúdo do PDF {file.get('name')}:\n{pdf_text[:3000]}..."
-                    print(f"PDF processado: {file.get('name')} - {len(pdf_text)} caracteres")
+        image_contents = []  # Lista para armazenar imagens processadas
         
-        # Adicionar contexto do arquivo à mensagem para o Claude
+        for file in files:
+            file_type = file.get('type', '')
+            file_name = file.get('name', '')
+            file_data = file.get('data', '')
+            
+            if file_type == 'application/pdf':
+                # Processa PDFs como antes
+                pdf_text = extract_pdf_text(file_data)
+                if pdf_text:
+                    file_context += f"\n\nConteúdo do PDF {file_name}:\n{pdf_text[:3000]}..."
+                    print(f"PDF processado: {file_name}")
+                    
+            elif file_type.startswith('image/'):
+                # Processa imagens para o Claude
+                image_content = process_image_for_claude(file_data, file_type)
+                if image_content:
+                    image_contents.append(image_content)
+                    print(f"Imagem processada: {file_name} - Tipo: {file_type}")
+        
+        # Adicionar contexto do PDF à mensagem (se houver)
         full_message = message
         if file_context:
             full_message += f"\n\n[Arquivo anexado]{file_context}"
-            print(f"Contexto do arquivo adicionado à mensagem")
         
         db = get_db()
         
@@ -715,11 +760,11 @@ def send_message():
                 'message': 'Conversa não encontrada'
             }), 404
         
-        # Adiciona mensagem do usuário (salva apenas a mensagem original)
+        # Adiciona mensagem do usuário
         user_message = Message(
             chat_id=chat.id,
             role='user',
-            content=message,  # Mensagem original sem o arquivo
+            content=message,  # Salva apenas a mensagem original
             files=files if files else None
         )
         db.add(user_message)
@@ -730,26 +775,53 @@ def send_message():
         
         db.commit()
         
-        # Prepara contexto para o Claude
-        messages = []
-        for msg in chat.messages[-10:]:  # Últimas 10 mensagens
-            messages.append({
-                'role': msg.role,
-                'content': msg.content
-            })
-        
-        # Para a última mensagem (atual), inclui o contexto do arquivo
-        if messages:
-            messages[-1]['content'] = full_message  # Usa a mensagem com o conteúdo do PDF
-        
         # Chamar API do Claude
         if client:
             try:
+                # Prepara as mensagens no formato correto para o Claude
+                claude_messages = []
+                
+                # Adiciona mensagens anteriores (sem imagens)
+                for msg in chat.messages[-10:-1]:  # Últimas 9 mensagens anteriores
+                    claude_messages.append({
+                        'role': msg.role,
+                        'content': msg.content
+                    })
+                
+                # Adiciona a mensagem atual com imagens (se houver)
+                if image_contents:
+                    # Formato especial quando tem imagens
+                    content_parts = []
+                    
+                    # Adiciona o texto primeiro
+                    content_parts.append({
+                        "type": "text",
+                        "text": full_message
+                    })
+                    
+                    # Adiciona cada imagem
+                    for img_content in image_contents:
+                        content_parts.append(img_content)
+                    
+                    claude_messages.append({
+                        'role': 'user',
+                        'content': content_parts  # Array com texto + imagens
+                    })
+                    
+                    print(f"Enviando mensagem com {len(image_contents)} imagem(ns) para o Claude")
+                else:
+                    # Mensagem normal sem imagens
+                    claude_messages.append({
+                        'role': 'user',
+                        'content': full_message
+                    })
+                
+                # Chama o Claude
                 response = client.messages.create(
                     model="claude-3-5-sonnet-20241022",
                     max_tokens=8000,
                     system=get_horizont_prompt(),
-                    messages=messages
+                    messages=claude_messages
                 )
                 
                 ai_response = response.content[0].text
@@ -757,12 +829,17 @@ def send_message():
                 
             except anthropic.APIError as e:
                 print(f"Erro da API Anthropic: {e}")
-                ai_response = generate_fallback_response(message)
+                if 'image' in str(e):
+                    ai_response = "Desculpe, houve um erro ao processar a imagem. Por favor, tente novamente ou envie em outro formato."
+                else:
+                    ai_response = generate_fallback_response(message)
             except Exception as e:
                 print(f"Erro inesperado na API: {e}")
+                import traceback
+                traceback.print_exc()
                 ai_response = generate_fallback_response(message)
         else:
-            print("Cliente Anthropic não configurado, usando resposta de fallback")
+            print("Cliente Anthropic não configurado")
             ai_response = generate_fallback_response(message)
         
         # Processar resposta para extrair dados de gráfico
