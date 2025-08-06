@@ -254,6 +254,7 @@ z-index: 100;
 
 .new-chat-btn {
 margin: 20px;
+margin-top: 20px;  /* ADICIONE ESTA LINHA */
 padding: 14px;
 background: #ffd700;
 border: none;
@@ -1101,6 +1102,11 @@ width: 85%;
 max-width: 320px;
 box-shadow: 2px 0 20px rgba(0, 0, 0, 0.3);
 background: rgba(20, 20, 20, 0.98);
+padding-top: env(safe-area-inset-top);
+}
+
+.new-chat-btn {
+margin-top: 40px;  /* Mais espaço no topo para iPhone */
 }
 
 .sidebar.open {
