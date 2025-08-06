@@ -122,9 +122,37 @@ Como expert em finanças, você DEVE:
 }
 [/GRAFICO_DADOS]
 ```
+```
+### Formato Padrão para Artefatos (Relatórios/Documentos)
+**Use quando criar relatórios detalhados, propostas ou documentos:**
 
+```
+[ARTEFATO]
+TIPO: report
+TITULO: Análise Completa do Investimento
+
+# Resumo Executivo
+[Conteúdo do resumo...]
+
+## Análise Detalhada
+[Conteúdo detalhado...]
+
+### Projeções
+[Tabelas e cálculos...]
+
+## Recomendações
+[Suas recomendações...]
+[/ARTEFATO]
+```
+
+Tipos de artefatos disponíveis:
+- `report`: Relatório completo
+- `proposal`: Proposta comercial
+- `analysis`: Análise financeira
+- `comparison`: Comparativo de produtos
+- `contract`: Minuta ou resumo de contrato
 ---
-
+```
 ## 🎯 PRODUTOS E ESPECIFICAÇÕES
 
 ### 🔵 HORIZONT SMART (Renda Fixa)
@@ -464,24 +492,73 @@ def process_image_for_claude(file_data, file_type):
         return None
 
 def parse_chart_from_response(text):
-    """Extrai dados de gráfico customizado da resposta do Claude"""
+    """Extrai dados de gráfico e mantém marcador de posição"""
     chart_data = None
     
     # Procurar por padrões de gráfico na resposta
     if '[GRAFICO_DADOS]' in text and '[/GRAFICO_DADOS]' in text:
         try:
-            start = text.find('[GRAFICO_DADOS]') + len('[GRAFICO_DADOS]')
-            end = text.find('[/GRAFICO_DADOS]')
-            chart_json = text[start:end].strip()
+            start = text.find('[GRAFICO_DADOS]')
+            end = text.find('[/GRAFICO_DADOS]') + len('[/GRAFICO_DADOS]')
+            
+            # Extrai o JSON do gráfico
+            json_start = start + len('[GRAFICO_DADOS]')
+            json_end = text.find('[/GRAFICO_DADOS]')
+            chart_json = text[json_start:json_end].strip()
             chart_data = json.loads(chart_json)
             
-            # Remover tags do texto
-            text = text[:text.find('[GRAFICO_DADOS]')] + text[text.find('[/GRAFICO_DADOS]') + len('[/GRAFICO_DADOS]'):]
+            # MUDANÇA: Substitui as tags por um marcador de posição
+            text = text[:start] + '{{GRAFICO_AQUI}}' + text[end:]
+            
         except Exception as e:
             print(f"Erro ao processar gráfico: {e}")
     
     return chart_data, text.strip()
-
+    
+def parse_artifact_from_response(text):
+    """Extrai artefatos (relatórios, documentos) da resposta"""
+    artifact_data = None
+    
+    # Procurar por padrões de artefato
+    if '[ARTEFATO]' in text and '[/ARTEFATO]' in text:
+        try:
+            start = text.find('[ARTEFATO]')
+            end = text.find('[/ARTEFATO]') + len('[/ARTEFATO]')
+            
+            # Extrai o conteúdo do artefato
+            content_start = start + len('[ARTEFATO]')
+            content_end = text.find('[/ARTEFATO]')
+            artifact_content = text[content_start:content_end].strip()
+            
+            # Tenta identificar o tipo de artefato
+            lines = artifact_content.split('\n')
+            artifact_type = 'report'  # padrão
+            title = 'Relatório'
+            
+            # Verifica se tem metadados
+            if lines[0].startswith('TIPO:'):
+                artifact_type = lines[0].replace('TIPO:', '').strip()
+                lines = lines[1:]
+            if lines[0].startswith('TITULO:'):
+                title = lines[0].replace('TITULO:', '').strip()
+                lines = lines[1:]
+            
+            content = '\n'.join(lines)
+            
+            artifact_data = {
+                'type': artifact_type,
+                'title': title,
+                'content': content
+            }
+            
+            # Substitui as tags por um marcador
+            text = text[:start] + '{{ARTEFATO_AQUI}}' + text[end:]
+            
+        except Exception as e:
+            print(f"Erro ao processar artefato: {e}")
+    
+    return artifact_data, text
+    
 def get_horizont_prompt():
     return system_prompt
 
@@ -843,7 +920,16 @@ def send_message():
             ai_response = generate_fallback_response(message)
         
         # Processar resposta para extrair dados de gráfico
-        chart_data, clean_response = parse_chart_from_response(ai_response)
+        chart_data, response_with_markers = parse_chart_from_response(ai_response)
+        artifact_data, clean_response = parse_artifact_from_response(response_with_markers)
+        # E quando salvar a mensagem da IA, adicione o artifact:
+        ai_message = Message(
+            chat_id=chat.id,
+            role='assistant',
+            content=clean_response,
+            chart=chart_data,
+            artifact=artifact_data  # NOVO: adicione isso se sua tabela tiver esse campo
+        )
         
         # Adiciona resposta da IA
         ai_message = Message(
