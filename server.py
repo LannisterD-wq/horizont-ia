@@ -695,7 +695,8 @@ def get_chats(username):
                     'content': msg.content,
                     'timestamp': msg.created_at.isoformat(),
                     'files': msg.files,
-                    'chart': msg.chart
+                    'chart': msg.chart,
+                    'artifact': msg.artifact  # ADICIONE ESTA LINHA!
                 })
             
             chats_data.append(chat_dict)
