@@ -726,7 +726,7 @@ content = content.replace(/R\$\s*([\d.,]+)/g, '<strong style="color: #ffd700;">R
 return content;
 }
 
-/ Format artifact content
+// Format artifact content
 function formatArtifactContent(content) {
     if (!content) return '';
     
