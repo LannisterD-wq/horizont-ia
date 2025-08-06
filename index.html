@@ -254,7 +254,7 @@ z-index: 100;
 
 .new-chat-btn {
 margin: 20px;
-margin-top: 20px;  /* ADICIONE ESTA LINHA */
+margin-top: 20px;
 padding: 14px;
 background: #ffd700;
 border: none;
@@ -511,6 +511,20 @@ height: calc(100% - 40px) !important;
 .chart-container.expanded .chart-expand-btn {
 display: block !important;
 z-index: 10001;
+position: fixed !important;
+top: 20px !important;
+right: 20px !important;
+background: rgba(255, 59, 48, 0.8) !important;
+color: white !important;
+font-size: 18px !important;
+padding: 12px 18px !important;
+border-radius: 50% !important;
+width: 50px !important;
+height: 50px !important;
+display: flex !important;
+align-items: center !important;
+justify-content: center !important;
+box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
 }
 
 /* Input Area */
@@ -1071,203 +1085,6 @@ font-size: 13px;
 margin-right: 8px;
 }
 
-::-webkit-scrollbar {
-width: 8px;
-height: 8px;
-}
-
-::-webkit-scrollbar-track {
-background: rgba(255, 255, 255, 0.02);
-}
-
-::-webkit-scrollbar-thumb {
-background: rgba(255, 255, 255, 0.1);
-border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-background: rgba(255, 255, 255, 0.2);
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-.input-area {
-        background: rgba(20, 20, 20, 0.98);  /* Mais opaco no mobile */
-        backdrop-filter: blur(10px);
-        border-top: 2px solid rgba(255, 215, 0, 0.3);  /* Borda mais visível */
-    }
-    
-    .message-input {
-        max-height: 80px;  /* Menor no mobile */
-        overflow-y: auto;  /* Scroll interno */
-    }
-    
-    /* Quando o teclado está aberto */
-    body.keyboard-open .input-area {
-        background: rgba(20, 20, 20, 1);  /* Totalmente opaco */
-    }
-}
-
-.artifact-header {
-flex-direction: column;
-text-align: center;
-gap: 10px;
-}
-    
-.artifact-header h3 {
-font-size: 14px;
-}
-    
-.artifact-content {
-padding: 15px;
-max-height: 400px;
-font-size: 14px;
-}
-    
-.artifact-copy-btn {
-        width: 100%;
-}
-/* Estilos para gráfico dentro do artefato */
-.artifact-chart-container {
-margin: 20px 0;
-padding: 15px;
-background: rgba(0, 0, 0, 0.2);
-border-radius: 8px;
-border: 1px solid rgba(255, 215, 0, 0.2);
-}
-    
-.artifact-chart-container canvas {
-max-width: 100%;
-height: 250px !important;
-}
-    
-.artifact-content .artifact-chart-container {
-width: 100%;
-box-sizing: border-box;
-}
-    
-.artifact-container {
-max-width: 100%;
-overflow-x: auto;
-    
-}   
-    
-.sidebar {
-position: fixed;
-left: 0;
-top: 0;
-bottom: 0;
-height: 100%;
-z-index: 1001;
-transform: translateX(-100%);
-width: 85%;
-max-width: 320px;
-box-shadow: 2px 0 20px rgba(0, 0, 0, 0.3);
-background: rgba(20, 20, 20, 0.98);
-padding-top: env(safe-area-inset-top);
-}
-
-.new-chat-btn {
-margin-top: 40px;  /* Mais espaço no topo para iPhone */
-}
-
-.sidebar.open {
-transform: translateX(0);
-}
-
-.menu-toggle {
-display: block;
-}
-
-.chat-area {
-width: 100%;
-}
-
-.admin-panel {
-padding: 20px;
-}
-
-.users-table {
-font-size: 14px;
-}
-
-.users-table th,
-.users-table td {
-padding: 8px 6px;
-}
-
-.leads-view {
-padding: 15px;
-padding-bottom: calc(30px + env(safe-area-inset-bottom));
-}
-
-.messages-container {
-padding: 15px;
-padding-bottom: 20px;
-}
-
-.input-area {
-padding: 15px;
-padding-bottom: calc(15px + env(safe-area-inset-bottom));
-}
-
-.chart-expand-btn {
-display: block;
-}
-
-.chart-container canvas {
-height: 200px !important;
-}
-
-.logo-header h2 {
-display: none;
-}
-
-.user-name {
-display: none;
-}
-
-@media (max-width: 350px) {
-.user-name {
-display: none;
-}
-}
-}
-
-/* iOS specific fixes */
-@supports (-webkit-touch-callout: none) {
-.app-container {
-display: none;
-flex-direction: column;
-height: 100vh;
-overflow: hidden;
-}
-.app-container.active {
-    display: flex !important;
-}
-
-.messages-container,
-.chat-list,
-.leads-view,
-.admin-panel {
--webkit-overflow-scrolling: touch;
-overscroll-behavior: contain;
-}
-}
-
-/* Keyboard open state */
-body.keyboard-open .input-area {
-position: fixed;
-bottom: 0;
-left: 0;
-right: 0;
-z-index: 1002;
-}
-
-body.keyboard-open .messages-container {
-padding-bottom: 100px;
-}
-
 /* Estilos para Artefatos */
 .artifact-container {
     margin: 20px 0;
@@ -1340,25 +1157,190 @@ padding-bottom: 100px;
     background: rgba(255, 255, 255, 0.2);
     transform: translateY(-2px);
 }
-/* Procure por .chart-container.expanded que já existe e ADICIONE logo após: */
 
-.chart-container.expanded .chart-expand-btn {
-    position: fixed !important;
-    top: 20px !important;
-    right: 20px !important;
-    background: rgba(255, 59, 48, 0.8) !important;
-    color: white !important;
-    font-size: 18px !important;
-    padding: 12px 18px !important;
-    border-radius: 50% !important;
-    width: 50px !important;
-    height: 50px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+/* Scrollbar */
+::-webkit-scrollbar {
+width: 8px;
+height: 8px;
 }
-  
+
+::-webkit-scrollbar-track {
+background: rgba(255, 255, 255, 0.02);
+}
+
+::-webkit-scrollbar-thumb {
+background: rgba(255, 255, 255, 0.1);
+border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+background: rgba(255, 255, 255, 0.2);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .input-area {
+        background: rgba(20, 20, 20, 0.98);
+        backdrop-filter: blur(10px);
+        border-top: 2px solid rgba(255, 215, 0, 0.3);
+    }
+    
+    .message-input {
+        max-height: 80px;
+        overflow-y: auto;
+    }
+    
+    body.keyboard-open .input-area {
+        background: rgba(20, 20, 20, 1);
+    }
+    
+    .artifact-header {
+        flex-direction: column;
+        text-align: center;
+        gap: 10px;
+    }
+    
+    .artifact-header h3 {
+        font-size: 14px;
+    }
+    
+    .artifact-content {
+        padding: 15px;
+        max-height: 400px;
+        font-size: 14px;
+    }
+    
+    .artifact-copy-btn {
+        width: 100%;
+    }
+    
+    .artifact-chart-container {
+        margin: 20px 0;
+        padding: 15px;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 8px;
+        border: 1px solid rgba(255, 215, 0, 0.2);
+    }
+    
+    .artifact-chart-container canvas {
+        max-width: 100%;
+        height: 250px !important;
+    }
+    
+    .sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        height: 100%;
+        z-index: 1001;
+        transform: translateX(-100%);
+        width: 85%;
+        max-width: 320px;
+        box-shadow: 2px 0 20px rgba(0, 0, 0, 0.3);
+        background: rgba(20, 20, 20, 0.98);
+        padding-top: env(safe-area-inset-top);
+    }
+    
+    .new-chat-btn {
+        margin-top: 40px;
+    }
+    
+    .sidebar.open {
+        transform: translateX(0);
+    }
+    
+    .menu-toggle {
+        display: block;
+    }
+    
+    .chat-area {
+        width: 100%;
+    }
+    
+    .admin-panel {
+        padding: 20px;
+    }
+    
+    .users-table {
+        font-size: 14px;
+    }
+    
+    .users-table th,
+    .users-table td {
+        padding: 8px 6px;
+    }
+    
+    .leads-view {
+        padding: 15px;
+        padding-bottom: calc(30px + env(safe-area-inset-bottom));
+    }
+    
+    .messages-container {
+        padding: 15px;
+        padding-bottom: 20px;
+    }
+    
+    .input-area {
+        padding: 15px;
+        padding-bottom: calc(15px + env(safe-area-inset-bottom));
+    }
+    
+    .chart-expand-btn {
+        display: block;
+    }
+    
+    .chart-container canvas {
+        height: 200px !important;
+    }
+    
+    .logo-header h2 {
+        display: none;
+    }
+    
+    .user-name {
+        display: none;
+    }
+}
+
+/* iOS specific fixes - CORRIGIDO! */
+@supports (-webkit-touch-callout: none) {
+    /* Estado inicial - escondido */
+    .app-container {
+        display: none;
+        flex-direction: column;
+        height: 100vh;
+        overflow: hidden;
+    }
+    
+    /* Estado ativo - visível */
+    .app-container.active {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    .messages-container,
+    .chat-list,
+    .leads-view,
+    .admin-panel {
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+    }
+}
+
+/* Keyboard open state */
+body.keyboard-open .input-area {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1002;
+}
+
+body.keyboard-open .messages-container {
+    padding-bottom: 100px;
+}
 </style>
 </head>
 <body>
