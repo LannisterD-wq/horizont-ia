@@ -514,10 +514,17 @@ async function loadChats() {
         const data = await response.json();
 
         if (data.success) {
-            // Garante que cada chat tem um array de mensagens
+            // Garante que cada chat tem um array de mensagens COM artifacts
             chats = data.chats.map(chat => ({
                 ...chat,
-                messages: Array.isArray(chat.messages) ? chat.messages : []
+                messages: Array.isArray(chat.messages) ? chat.messages.map(msg => ({
+                    role: msg.role,
+                    content: msg.content,
+                    timestamp: msg.timestamp,
+                    files: msg.files,
+                    chart: msg.chart,
+                    artifact: msg.artifact // IMPORTANTE: Adicionar artifact aqui!
+                })) : []
             }));
             
             console.log('Chats carregados:', chats);
