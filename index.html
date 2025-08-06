@@ -1358,7 +1358,7 @@ body.keyboard-open .messages-container {
 
 <div class="error-message" id="loginError"></div>
 
-<form id="loginForm" onsubmit="handleLogin(event)">
+<form id="loginForm" method="POST" action="#" onsubmit="return handleLogin(event)">
 <div class="form-group">
 <label for="username">Usuário</label>
 <input type="text" id="username" name="username" required autocomplete="username">
