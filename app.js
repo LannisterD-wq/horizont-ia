@@ -891,7 +891,8 @@ async function sendMessage() {
             userMessage.files = selectedFiles.map(f => ({
                 name: f.name,
                 type: f.type,
-                size: f.size
+                size: f.size,
+                data: f.data  // CERTIFIQUE-SE QUE ESTA LINHA EXISTE
             }));
         }
         
