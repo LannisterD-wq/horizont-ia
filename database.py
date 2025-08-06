@@ -81,6 +81,7 @@ class Message(Base):
     content = Column(Text, nullable=False)
     files = Column(JSON)  # Armazena info dos arquivos como JSON
     chart = Column(JSON)  # Armazena dados do gráfico como JSON
+    artifact = Column(JSON)  # NOVO: adicione esta linha
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relacionamentos
