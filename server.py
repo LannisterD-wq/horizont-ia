@@ -937,7 +937,8 @@ def send_message():
         return jsonify({
             'success': True,
             'response': clean_response,
-            'chart': chart_data
+            'chart': chart_data,
+            'artifact': artifact_data
         })
         
     except Exception as e:
