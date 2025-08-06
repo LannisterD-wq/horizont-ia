@@ -615,64 +615,98 @@ alert('Erro ao deletar conversa');
 
 // Render messages
 function renderMessages() {
-const messagesContainer = document.getElementById('messagesContainer');
+    const messagesContainer = document.getElementById('messagesContainer');
 
-if (!currentChatId) {
-messagesContainer.innerHTML = `
-           <div style="text-align: center; padding: 50px; color: #666;">
-               <h2>Bem-vindo ao Horizont IA</h2>
-               <p>Selecione uma conversa ou crie uma nova para começar</p>
-           </div>
-       `;
-return;
-}
+    if (!currentChatId) {
+        messagesContainer.innerHTML = `
+            <div style="text-align: center; padding: 50px; color: #666;">
+                <h2>Bem-vindo ao Horizont IA</h2>
+                <p>Selecione uma conversa ou crie uma nova para começar</p>
+            </div>
+        `;
+        return;
+    }
 
-const currentChat = chats.find(chat => chat.id === currentChatId);
-if (!currentChat) return;
+    const currentChat = chats.find(chat => chat.id === currentChatId);
+    if (!currentChat) return;
 
-messagesContainer.innerHTML = '';
+    messagesContainer.innerHTML = '';
 
-currentChat.messages.forEach((msg, index) => {
-const messageDiv = document.createElement('div');
-messageDiv.className = `message ${msg.role}`;
+    currentChat.messages.forEach((msg, index) => {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${msg.role}`;
 
-const avatar = msg.role === 'user' ? '👤' : '🤖';
+        const avatar = msg.role === 'user' ? '👤' : '🤖';
 
-let messageContent = `
-           <div class="message-avatar">${avatar}</div>
-           <div class="message-content">
-       `;
+        let messageContent = `
+            <div class="message-avatar">${avatar}</div>
+            <div class="message-content">
+        `;
 
-// Add share button for assistant messages with valuable content
-if (msg.role === 'assistant' && (msg.content.includes('R$') || msg.chart)) {
-messageContent += `
-               <button class="share-btn" onclick="shareViaWhatsApp(${index})">
-                   📱 Compartilhar no WhatsApp
-               </button>
-           `;
-}
+        // Add share button for assistant messages with valuable content
+        if (msg.role === 'assistant' && (msg.content.includes('R$') || msg.chart)) {
+            messageContent += `
+                <button class="share-btn" onclick="shareViaWhatsApp(${index})">
+                    📱 Compartilhar no WhatsApp
+                </button>
+            `;
+        }
 
-messageContent += formatMessage(msg.content);
-messageContent += '</div>';
+        // NOVO: Processa o conteúdo da mensagem
+        let processedContent = formatMessage(msg.content);
+        
+        // NOVO: Substitui marcador do gráfico se existir
+        if (msg.chart && processedContent.includes('{{GRAFICO_AQUI}}')) {
+            const chartId = `chart-${currentChatId}-${index}`;
+            const chartHtml = `
+                <div class="chart-container" id="container-${chartId}">
+                    <canvas id="${chartId}"></canvas>
+                </div>
+            `;
+            processedContent = processedContent.replace('{{GRAFICO_AQUI}}', chartHtml);
+        }
+        
+        // NOVO: Substitui marcador do artefato se existir
+        if (msg.artifact && processedContent.includes('{{ARTEFATO_AQUI}}')) {
+            const artifactHtml = `
+                <div class="artifact-container">
+                    <div class="artifact-header">
+                        <span class="artifact-type">${msg.artifact.type || 'report'}</span>
+                        <h3>${msg.artifact.title || 'Documento'}</h3>
+                        <button onclick="copyArtifact('${index}')" class="artifact-copy-btn">
+                            📋 Copiar
+                        </button>
+                    </div>
+                    <div class="artifact-content">
+                        ${formatArtifactContent(msg.artifact.content)}
+                    </div>
+                </div>
+            `;
+            processedContent = processedContent.replace('{{ARTEFATO_AQUI}}', artifactHtml);
+        }
 
-messageDiv.innerHTML = messageContent;
-messagesContainer.appendChild(messageDiv);
+        messageContent += processedContent;
+        messageContent += '</div>';
 
-// Render chart if exists
-if (msg.chart) {
-const chartContainer = document.createElement('div');
-chartContainer.className = 'chart-container';
-chartContainer.innerHTML = `<canvas id="chart-${index}"></canvas>`;
-messageDiv.querySelector('.message-content').appendChild(chartContainer);
+        messageDiv.innerHTML = messageContent;
+        messagesContainer.appendChild(messageDiv);
 
-setTimeout(() => renderChart(msg.chart, `chart-${index}`), 100);
-}
-});
+        // NOVO: Renderiza o gráfico após inserir o HTML
+        if (msg.chart) {
+            const chartId = `chart-${currentChatId}-${index}`;
+            setTimeout(() => {
+                // Verifica se o canvas existe antes de renderizar
+                if (document.getElementById(chartId)) {
+                    renderChart(msg.chart, chartId);
+                }
+            }, 100);
+        }
+    });
 
-// Scroll to bottom
-setTimeout(() => {
-messagesContainer.scrollTop = messagesContainer.scrollHeight;
-}, 100);
+    // Scroll to bottom
+    setTimeout(() => {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }, 100);
 }
 
 // Format message content (basic markdown support)
@@ -690,6 +724,76 @@ content = content.replace(/^- (.*?)$/gm, '• $1');
 content = content.replace(/R\$\s*([\d.,]+)/g, '<strong style="color: #ffd700;">R$ $1</strong>');
 
 return content;
+}
+
+/ Format artifact content
+function formatArtifactContent(content) {
+    if (!content) return '';
+    
+    // Converte markdown básico
+    let formatted = content
+        .replace(/^# (.*?)$/gm, '<h1>$1</h1>')
+        .replace(/^## (.*?)$/gm, '<h2>$1</h2>')
+        .replace(/^### (.*?)$/gm, '<h3>$1</h3>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/\n/g, '<br>')
+        .replace(/^- (.*?)$/gm, '• $1');
+    
+    // Destaca valores monetários
+    formatted = formatted.replace(/R\$\s*([\d.,]+)/g, '<strong style="color: #ffd700;">R$ $1</strong>');
+    
+    return formatted;
+}
+
+// Copy artifact to clipboard
+function copyArtifact(messageIndex) {
+    const currentChat = chats.find(chat => chat.id === currentChatId);
+    if (!currentChat) return;
+    
+    const message = currentChat.messages[messageIndex];
+    if (!message.artifact) return;
+    
+    // Remove HTML tags para copiar texto limpo
+    const textContent = message.artifact.content
+        .replace(/<[^>]*>/g, '')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#039;/g, "'");
+    
+    // Copia para clipboard
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(textContent).then(() => {
+            alert('Conteúdo copiado para a área de transferência!');
+        }).catch(err => {
+            console.error('Erro ao copiar:', err);
+            fallbackCopyTextToClipboard(textContent);
+        });
+    } else {
+        fallbackCopyTextToClipboard(textContent);
+    }
+}
+
+// Fallback para copiar texto (navegadores antigos)
+function fallbackCopyTextToClipboard(text) {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    textArea.style.top = "-999999px";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    
+    try {
+        document.execCommand('copy');
+        alert('Conteúdo copiado!');
+    } catch (err) {
+        alert('Erro ao copiar. Por favor, selecione e copie manualmente.');
+    }
+    
+    document.body.removeChild(textArea);
 }
 
 // Share via WhatsApp
@@ -828,11 +932,12 @@ async function sendMessage() {
             if (data.success) {
                 // Adiciona resposta da IA
                 currentChat.messages.push({
-                    role: 'assistant',
-                    content: data.response,
-                    timestamp: new Date().toISOString(),
-                    chart: data.chart
-                });
+                   role: 'assistant',
+                   content: data.response,
+                   timestamp: new Date().toISOString(),
+                   chart: data.chart,
+                   artifact: data.artifact  // ADICIONE ESTA LINHA
+               });
                 
                 renderMessages();
                 
