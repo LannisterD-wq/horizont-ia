@@ -1090,17 +1090,41 @@ const isMobile = window.innerWidth < 768;
 
 // Add expand button for mobile
 if (isMobile) {
-const canvas = document.getElementById(canvasId);
-const container = canvas.closest('.chart-container');
+    const canvas = document.getElementById(canvasId);
+    const container = canvas.closest('.chart-container');
 
-if (!container.querySelector('.chart-expand-btn')) {
-const expandBtn = document.createElement('button');
-expandBtn.className = 'chart-expand-btn';
-expandBtn.textContent = '⛶ Expandir';
-expandBtn.style.display = 'block';
-expandBtn.onclick = function() {
-container.classList.toggle('expanded');
-this.textContent = container.classList.contains('expanded') ? '⛶ Recolher' : '⛶ Expandir';
+    if (!container.querySelector('.chart-expand-btn')) {
+        const expandBtn = document.createElement('button');
+        expandBtn.className = 'chart-expand-btn';
+        expandBtn.textContent = '⛶ Expandir';
+        expandBtn.style.display = 'block';
+        
+        // NOVA FUNÇÃO DE EXPANDIR COM BOTÃO FECHAR
+        expandBtn.onclick = function() {
+            container.classList.toggle('expanded');
+            
+            if (container.classList.contains('expanded')) {
+                this.textContent = '✕ Fechar';  // Muda para X
+                this.style.background = 'rgba(255, 59, 48, 0.3)';  // Vermelho
+                this.style.fontSize = '16px';
+                this.style.padding = '10px 15px';
+                this.style.zIndex = '10002';  // Garante que fica acima
+            } else {
+                this.textContent = '⛶ Expandir';
+                this.style.background = 'rgba(255, 255, 255, 0.1)';
+                this.style.fontSize = '12px';
+                this.style.padding = '5px 10px';
+            }
+
+            // Recreate chart with new size
+            setTimeout(() => {
+                ctx.chart.destroy();
+                renderChart(chartData, canvasId);
+            }, 300);
+        };
+        container.appendChild(expandBtn);
+    }
+}
 
 // Recreate chart with new size
 setTimeout(() => {
