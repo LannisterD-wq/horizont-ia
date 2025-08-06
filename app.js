@@ -668,22 +668,57 @@ function renderMessages() {
         
         // NOVO: Substitui marcador do artefato se existir
         if (msg.artifact && processedContent.includes('{{ARTEFATO_AQUI}}')) {
-            const artifactHtml = `
-                <div class="artifact-container">
-                    <div class="artifact-header">
-                        <span class="artifact-type">${msg.artifact.type || 'report'}</span>
-                        <h3>${msg.artifact.title || 'Documento'}</h3>
-                        <button onclick="copyArtifact('${index}')" class="artifact-copy-btn">
-                            📋 Copiar
-                        </button>
-                    </div>
-                    <div class="artifact-content">
-                        ${formatArtifactContent(msg.artifact.content)}
-                    </div>
-                </div>
-            `;
-            processedContent = processedContent.replace('{{ARTEFATO_AQUI}}', artifactHtml);
-        }
+               // Gera um ID único para este artefato
+               const artifactId = `artifact-${currentChatId}-${index}`;
+               
+               const artifactHtml = `
+                   <div class="artifact-container" id="${artifactId}">
+                       <div class="artifact-header">
+                           <span class="artifact-type">${msg.artifact.type || 'report'}</span>
+                           <h3>${msg.artifact.title || 'Documento'}</h3>
+                           <button onclick="copyArtifact('${index}')" class="artifact-copy-btn">
+                               📋 Copiar
+                           </button>
+                       </div>
+                       <div class="artifact-content">
+                           ${formatArtifactContent(msg.artifact.content)}
+                       </div>
+                   </div>
+               `;
+               processedContent = processedContent.replace('{{ARTEFATO_AQUI}}', artifactHtml);
+               
+               // Se tem gráfico, renderiza DENTRO do artefato após um delay
+               if (msg.chart && msg.artifact.content.includes('{{GRAFICO_AQUI}}')) {
+                   setTimeout(() => {
+                       const artifactElement = document.getElementById(artifactId);
+                       if (artifactElement) {
+                           const contentDiv = artifactElement.querySelector('.artifact-content');
+                           if (contentDiv) {
+                               // Cria container para o gráfico
+                               const chartHtml = `
+                                   <div class="artifact-chart-container">
+                                       <canvas id="artifact-chart-${artifactId}"></canvas>
+                                   </div>
+                               `;
+                               
+                               // Substitui o marcador pelo canvas
+                               const currentHtml = contentDiv.innerHTML;
+                               if (currentHtml.includes('{{GRAFICO_AQUI}}')) {
+                                   contentDiv.innerHTML = currentHtml.replace('{{GRAFICO_AQUI}}', chartHtml);
+                                   
+                                   // Renderiza o gráfico
+                                   setTimeout(() => {
+                                       const canvasElement = document.getElementById(`artifact-chart-${artifactId}`);
+                                       if (canvasElement) {
+                                           renderChart(msg.chart, `artifact-chart-${artifactId}`);
+                                       }
+                                   }, 100);
+                               }
+                           }
+                       }
+                   }, 200);
+               }
+           }
 
         messageContent += processedContent;
         messageContent += '</div>';
