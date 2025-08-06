@@ -1151,39 +1151,73 @@ function removeFile(index) {
 
 // Render chart
 function renderChart(chartData, canvasId) {
-    const ctx = document.getElementById(canvasId).getContext('2d');
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
     const isMobile = window.innerWidth < 768;
 
     // Add expand button for mobile
     if (isMobile) {
-        const canvas = document.getElementById(canvasId);
         const container = canvas.closest('.chart-container');
 
-        if (!container.querySelector('.chart-expand-btn')) {
+        if (container && !container.querySelector('.chart-expand-btn')) {
             const expandBtn = document.createElement('button');
             expandBtn.className = 'chart-expand-btn';
-            expandBtn.textContent = '⛶ Expandir';
+            expandBtn.innerHTML = '⛶ Expandir';
             expandBtn.style.display = 'block';
             
             expandBtn.onclick = function() {
+                // Cria ou remove overlay
+                let overlay = document.querySelector('.chart-overlay');
+                
+                if (!overlay) {
+                    overlay = document.createElement('div');
+                    overlay.className = 'chart-overlay';
+                    document.body.appendChild(overlay);
+                    
+                    // Fecha ao clicar no overlay
+                    overlay.onclick = function() {
+                        container.classList.remove('expanded');
+                        overlay.classList.remove('active');
+                        expandBtn.innerHTML = '⛶ Expandir';
+                        expandBtn.style.background = 'rgba(255, 255, 255, 0.1)';
+                        
+                        // Recria o gráfico
+                        setTimeout(() => {
+                            if (ctx.chart) ctx.chart.destroy();
+                            renderChart(chartData, canvasId);
+                        }, 300);
+                    };
+                }
+                
                 container.classList.toggle('expanded');
                 
                 if (container.classList.contains('expanded')) {
-                    this.textContent = '✕ Fechar';
-                    this.style.background = 'rgba(255, 59, 48, 0.3)';
-                    this.style.fontSize = '16px';
-                    this.style.padding = '10px 15px';
-                    this.style.zIndex = '10002';
+                    // Expandindo
+                    overlay.classList.add('active');
+                    this.innerHTML = '✕ Fechar Gráfico';
+                    this.style.background = '#ff3b30';
+                    this.style.color = 'white';
+                    this.style.fontWeight = 'bold';
+                    
+                    // Previne scroll do body
+                    document.body.style.overflow = 'hidden';
                 } else {
-                    this.textContent = '⛶ Expandir';
+                    // Fechando
+                    overlay.classList.remove('active');
+                    this.innerHTML = '⛶ Expandir';
                     this.style.background = 'rgba(255, 255, 255, 0.1)';
-                    this.style.fontSize = '12px';
-                    this.style.padding = '5px 10px';
+                    this.style.color = '#fff';
+                    this.style.fontWeight = 'normal';
+                    
+                    // Restaura scroll do body
+                    document.body.style.overflow = '';
                 }
 
                 // Recreate chart with new size
                 setTimeout(() => {
-                    ctx.chart.destroy();
+                    if (ctx.chart) ctx.chart.destroy();
                     renderChart(chartData, canvasId);
                 }, 300);
             };
@@ -1225,7 +1259,8 @@ function renderChart(chartData, canvasId) {
                     text: chartData.title || 'Comparativo de Investimentos',
                     color: '#fff',
                     font: {
-                        size: isMobile ? 14 : 16
+                        size: isMobile ? 14 : 16,
+                        weight: 'bold'
                     }
                 },
                 legend: {
@@ -1273,6 +1308,13 @@ function renderChart(chartData, canvasId) {
 
     // Store chart instance for later use
     ctx.chart = chart;
+}
+
+// Adicione também esta função para limpar overlays ao fazer logout
+function cleanupChartOverlays() {
+    const overlays = document.querySelectorAll('.chart-overlay');
+    overlays.forEach(overlay => overlay.remove());
+    document.body.style.overflow = '';
 }
 
 // Admin functions
