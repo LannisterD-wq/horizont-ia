@@ -859,7 +859,7 @@ def send_message():
                 claude_messages = []
                 
                 # Adiciona mensagens anteriores (sem imagens)
-                for msg in chat.messages[-10:-1]:  # Últimas 9 mensagens anteriores
+                for msg in chat.messages[-20:-1]:  # Últimas 9 mensagens anteriores
                     claude_messages.append({
                         'role': msg.role,
                         'content': msg.content
@@ -931,13 +931,6 @@ def send_message():
             artifact=artifact_data  # NOVO: adicione isso se sua tabela tiver esse campo
         )
         
-        # Adiciona resposta da IA
-        ai_message = Message(
-            chat_id=chat.id,
-            role='assistant',
-            content=clean_response,
-            chart=chart_data
-        )
         db.add(ai_message)
         db.commit()
         
