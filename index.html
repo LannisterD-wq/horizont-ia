@@ -1202,6 +1202,103 @@ z-index: 1002;
 body.keyboard-open .messages-container {
 padding-bottom: 100px;
 }
+
+/* Estilos para Artefatos */
+.artifact-container {
+    margin: 20px 0;
+    background: rgba(255, 215, 0, 0.05);
+    border: 2px solid rgba(255, 215, 0, 0.3);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.artifact-header {
+    background: rgba(255, 215, 0, 0.1);
+    padding: 15px 20px;
+    border-bottom: 1px solid rgba(255, 215, 0, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.artifact-type {
+    background: rgba(255, 215, 0, 0.3);
+    color: #ffd700;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.artifact-header h3 {
+    margin: 0;
+    color: #ffd700;
+    flex: 1;
+    font-size: 16px;
+}
+
+.artifact-content {
+    padding: 20px;
+    max-height: 600px;
+    overflow-y: auto;
+    line-height: 1.6;
+    color: #e0e0e0;
+}
+
+.artifact-content h1,
+.artifact-content h2,
+.artifact-content h3 {
+    color: #ffd700;
+    margin-top: 15px;
+    margin-bottom: 10px;
+}
+
+.artifact-content h1 { font-size: 24px; }
+.artifact-content h2 { font-size: 20px; }
+.artifact-content h3 { font-size: 18px; }
+
+.artifact-copy-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+}
+
+.artifact-copy-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-2px);
+}
+
+/* Responsivo para mobile */
+@media (max-width: 768px) {
+    .artifact-header {
+        flex-direction: column;
+        text-align: center;
+        gap: 10px;
+    }
+    
+    .artifact-header h3 {
+        font-size: 14px;
+    }
+    
+    .artifact-content {
+        padding: 15px;
+        max-height: 400px;
+        font-size: 14px;
+    }
+    
+    .artifact-copy-btn {
+        width: 100%;
+    }
+}
+  
 </style>
 </head>
 <body>
