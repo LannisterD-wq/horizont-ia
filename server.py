@@ -896,7 +896,7 @@ def send_message():
                 
                 # Chama o Claude
                 response = client.messages.create(
-                    model="claude-3-5-sonnet-20241022",
+                    model="claude-3-opus-latest",
                     max_tokens=8000,
                     system=get_horizont_prompt(),
                     messages=claude_messages
